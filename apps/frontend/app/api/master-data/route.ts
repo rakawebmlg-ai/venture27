@@ -159,3 +159,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const idParam = searchParams.get('id');
+    const categoryIdParam = searchParams.get('categoryId');
+
+    if (idParam) {
+      const id = Number(idParam);
+      if (Number.isNaN(id)) {
+        return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+      }
+      await prisma.masterData.delete({ where: { id } });
+      return NextResponse.json({ success: true, count: 1 });
+    }
+
+    if (categoryIdParam) {
+      const categoryId = Number(categoryIdParam);
+      if (Number.isNaN(categoryId)) {
+        return NextResponse.json({ error: 'Invalid categoryId' }, { status: 400 });
+      }
+      const { count } = await prisma.masterData.deleteMany({ where: { categoryId } });
+      return NextResponse.json({ success: true, count });
+    }
+
+    const body = await req.json().catch(() => null);
+    const ids = body?.ids;
+    if (Array.isArray(ids) && ids.length > 0) {
+      const { count } = await prisma.masterData.deleteMany({ where: { id: { in: ids.map(Number) } } });
+      return NextResponse.json({ success: true, count });
+    }
+
+    return NextResponse.json({ error: 'Provide id, categoryId, or ids' }, { status: 400 });
+  } catch (error) {
+    console.error('Failed to delete master data:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

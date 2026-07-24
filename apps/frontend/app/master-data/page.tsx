@@ -17,6 +17,8 @@ export default function MasterDataPage() {
   
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [data, setData] = useState<any[]>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -125,6 +127,47 @@ export default function MasterDataPage() {
     }
   };
 
+  const deleteItem = async (item: any) => {
+    if (!confirm(`Delete "${item.service?.name}" - ${item.location?.city} from master data? This cannot be undone.`)) return;
+    setDeletingId(item.id);
+    try {
+      const res = await fetch(`/api/master-data?id=${item.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setData(prev => prev.filter(d => d.id !== item.id));
+      } else {
+        const result = await res.json().catch(() => null);
+        alert(result?.error || 'Failed to delete item');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error connecting to server');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const deleteCategory = async (cName: string, items: typeof filteredData) => {
+    if (!confirm(`Delete all ${items.length} item(s) in "${cName}"? This cannot be undone.`)) return;
+    const categoryId = items[0]?.categoryId;
+    if (categoryId === undefined) return;
+    setDeletingCategory(cName);
+    try {
+      const res = await fetch(`/api/master-data?categoryId=${categoryId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const deletedIds = new Set(items.map(i => i.id));
+        setData(prev => prev.filter(d => !deletedIds.has(d.id)));
+      } else {
+        const result = await res.json().catch(() => null);
+        alert(result?.error || 'Failed to delete category');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error connecting to server');
+    } finally {
+      setDeletingCategory(null);
+    }
+  };
+
   const exportCSV = (cName: string, items: typeof filteredData) => {
     const headers = ['No', 'Category', 'City/Community', 'Province', 'Service Name', 'Meta Title', 'Meta Description', 'Heading', 'Subheading', 'Content Status', 'Image Status'];
     const rows = items.map((item, idx) => [
@@ -204,24 +247,25 @@ export default function MasterDataPage() {
                 <th>Heading</th>
                 <th>Content</th>
                 <th>Image</th>
+                <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             {loading ? (
-               <tbody><tr><td colSpan={8} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
+               <tbody><tr><td colSpan={9} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName];
                 return (
                   <tbody key={groupName}>
-                    <tr 
-                      className="group-header-row" 
+                    <tr
+                      className="group-header-row"
                       onClick={() => toggleGroup(groupName)}
                       style={{ cursor: 'pointer', background: 'var(--color-bg-secondary)', transition: 'background 0.2s' }}
                     >
-                      <td colSpan={8} style={{ padding: '12px 20px' }}>
+                      <td colSpan={9} style={{ padding: '12px 20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <svg 
+                            <svg
                               width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                               style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.2s', color: 'var(--color-text-muted)' }}
                             >
@@ -231,17 +275,28 @@ export default function MasterDataPage() {
                             <strong style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{groupName}</strong>
                             <span className="badge badge-info" style={{ marginLeft: '4px' }}>{items.length} items</span>
                           </div>
-                          <button 
-                            className="btn btn-ghost btn-sm" 
-                            onClick={(e) => { e.stopPropagation(); exportCSV(groupName, items); }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            Export CSV
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={(e) => { e.stopPropagation(); exportCSV(groupName, items); }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                              Export CSV
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ color: 'var(--color-error)' }}
+                              disabled={deletingCategory === groupName}
+                              onClick={(e) => { e.stopPropagation(); deleteCategory(groupName, items); }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                              {deletingCategory === groupName ? 'Deleting...' : 'Delete Category'}
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
-                    
+
                     {isExpanded && items.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
@@ -264,6 +319,16 @@ export default function MasterDataPage() {
                             <span className="badge badge-warning">Empty</span>
                           )}
                         </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ color: 'var(--color-error)' }}
+                            disabled={deletingId === item.id}
+                            onClick={() => deleteItem(item)}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -272,7 +337,7 @@ export default function MasterDataPage() {
             ) : (
               <tbody>
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📂</div>
                       <div className="empty-state-title">No data found</div>
