@@ -6,7 +6,10 @@
 ## Current Objective
 1. Fixed the "Generate Master Data" flow on `/master-data` (placeholder rendering, service template refresh, delete support).
 2. Added a batch "Limit" and a Category picker to `/generate-content` so the user can choose a category, generate N rows now, and continue later without re-processing already-done rows.
-3. Added a new `/publish-content` menu to review generated articles (grouped by City/Community/County, Province, Category, Service Name) and mark them "published" (internal status flag - user explicitly confirmed no public-facing route is wanted) via an Import action, with Unpublish to undo. Added `MasterData.published`/`publishedAt` via `prisma db push`.
+3. Added `MasterData.published`/`publishedAt` (via `prisma db push`) and a publish workflow. Originally built as one combined `/publish-content` page, then split per explicit user request into:
+   - `/import` — review + import generated-but-unpublished content (grouped by category).
+   - `/services` — browse published content via a "Select Service" dropdown (taxonomy: City/Community/County, Province, Category per service), with a preview-only "Slug" column hinting at the eventual public URL shape. Still an internal status flag only - user confirmed no public-facing route yet.
+   Both share `GET/POST /api/publish` (action: 'import' | 'unpublish', targeting `ids` or `categoryId`).
 
 ## Current Task
 Done for this session. Awaiting user's next command (deploy/push, or continue with Pending items below).
@@ -33,9 +36,10 @@ Done for this session. Awaiting user's next command (deploy/push, or continue wi
 - `apps/frontend/app/api/generate/route.ts` — 'start' action accepts `limit`, computes `totalItems = min(limit, pendingCount)`, and always forwards an explicit `limit` to the BullMQ job.
 - `apps/backend/src/index.ts` — worker now fetches pending items `orderBy: id asc` with `take: limit` so batches are deterministic and don't overlap; fixed progress to be scoped to the current batch (was counting category-wide 'generated' rows, which broke as soon as a second batch ran); fixed a bug where marking a job 'completed' tried to set a non-existent `completedAt` field and silently threw, so 100%-complete jobs never flipped to 'completed' and the UI spun forever - completion is now decided by whether the loop ran to the end, not just `progress >= 100` (so one failed item no longer blocks completion).
 - `packages/database/prisma/schema.prisma` — added `MasterData.published Boolean @default(false)` and `MasterData.publishedAt DateTime?`. Applied with `npx prisma db push` in `packages/database` (had to stop both dev servers first - see Problems Encountered below - then restart them).
-- New `apps/frontend/app/publish-content/page.tsx` + `apps/frontend/app/api/publish/route.ts` — the Publish Content menu described in Current Objective #3.
+- New `apps/frontend/app/import/page.tsx` + `apps/frontend/app/services/page.tsx` + `apps/frontend/app/api/publish/route.ts` — the publish workflow described in Current Objective #3 (`/publish-content` was built first, then deleted and split into these two per explicit follow-up request).
 - New `apps/frontend/app/lib/placeholders.ts` — `renderPlaceholders` factored out of the master-data route so `/api/publish` can reuse it.
-- `apps/frontend/app/components/Sidebar.tsx` — added "Publish Content" nav item (Post-Generation section, above History).
+- New `apps/frontend/app/lib/slug.ts` — `buildSlugPreview(city, category, serviceName)`, a pure display-only helper, not wired to any route.
+- `apps/frontend/app/components/Sidebar.tsx` — "Import" and "Service" nav items (Post-Generation section, above History).
 
 ## Important Context
 - The project is a Monorepo. Use npm workspaces (`npm run dev --workspace=@venture27/frontend`).
@@ -69,7 +73,7 @@ Done for this session. Awaiting user's next command (deploy/push, or continue wi
 2. `/result-guide` is still a fully static/mocked page (hardcoded numbers, fake URLs like `service.venture27.com/...`) - it describes a `{service}/{province}/{city}/{county}/{community}` URL hierarchy that doesn't exist in the schema. If the user later wants real public-facing pages (as opposed to the internal "published" status flag added this session), this page + a real location-type taxonomy would need to be built together.
 3. Remove or fix `apps/frontend/worker.ts` (pg-boss) since it's dead code that can never run against the BullMQ queue used by `apps/frontend/app/api/generate/route.ts` + `apps/backend/src/index.ts`.
 4. The `pause`/`resume` actions in `apps/frontend/app/api/generate/route.ts` are still broken: `resume` only flips the Job row back to `status: 'running'` in the DB but never re-enqueues a BullMQ job, so a paused job hangs forever (confirmed by reading the code and its own inline comment; not fixed this session — out of scope for the "limit and continue" feature, which sidesteps it entirely by starting a fresh job per batch instead of relying on pause/resume). Worth fixing or removing the Pause button if it's not going to be wired up properly.
-5. `/publish-content`'s "published" flag is purely internal (confirmed with the user - no slug, no public route, no sitemap). If that changes later, expect to add a slug field, a public-facing route/API, and reconcile with whatever `/result-guide`'s URL structure ends up being.
+5. The "published" flag (`/import`, `/services`) is purely internal (confirmed with the user - no public route, no sitemap yet). `/services` shows a preview-only slug (`/{city}/services/{category}/{service-name}`, see `app/lib/slug.ts`) foreshadowing a future public URL structure the user described - if that becomes real, expect a live route/API and reconciliation with whatever `/result-guide`'s (currently different, `{service}/{province}/{city}/{county}/{community}`) URL structure ends up being - the two haven't been reconciled yet.
 
 ## Instructions For The Next AI
 - Continue from the current project state.

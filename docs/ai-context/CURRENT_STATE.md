@@ -9,7 +9,7 @@ Active Development / Polishing
 ## Current Objective
 1. Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province}}` placeholders in Service CSV meta columns now render per-location, re-uploading a Service CSV updates its stored template instead of being silently ignored, and rows/categories can now be deleted.
 2. Added a batch "Limit" to `/generate-content` so a run can be capped to N rows and continued later; fixed two BullMQ worker bugs that were blocking that (per-batch progress, a job-completion update that referenced a non-existent field). Also added a Category picker so the user chooses which category to generate instead of it being implicit.
-3. Added a new `/publish-content` menu: review generated articles grouped by Category (City/Community/County, Province, Service Name columns) and mark them "published" (internal status only, no public route) via an Import action, with Unpublish to revert. Required a small additive schema change (`MasterData.published`, `MasterData.publishedAt`).
+3. Added `MasterData.published`/`publishedAt` and a publish workflow, split into two menus per the user's explicit request: `/import` (generated content not yet published, with import actions) and `/services` (published content, browsed via a "Select Service" dropdown, with a preview-only Slug column previewing the eventual `/{city}/services/{category}/{service-name}` URL structure). Both share `GET/POST /api/publish`.
 
 ## Completed
 - Next.js UI pages (`/`, `/master-data`, `/generate-content`, `/settings`).
@@ -22,7 +22,10 @@ Active Development / Polishing
 - Master Data delete: per-row and per-category deletion, both API (`DELETE /api/master-data`) and UI.
 - Generate Content batch limit: cap a run to the next N pending rows via a new "Limit" field; Start button becomes "Continue Generation (N remaining)" for subsequent batches. Backend worker batches deterministically (`orderBy: id asc` + `take: limit`) and reports progress per-batch.
 - Generate Content category picker: dropdown showing pending/total per category, drives the same start/limit/continue flow.
-- Publish Content (`/publish-content`, `GET/POST /api/publish`): "Ready to Import" (generated, unpublished) vs "Published Content" sections, grouped by category, with per-row/per-category/all import, per-row unpublish, CSV export of published rows, and a content preview modal. `MasterData` gained `published`/`publishedAt` columns.
+- Publish workflow, split across two menus (both use `GET/POST /api/publish`; `MasterData` gained `published`/`publishedAt` columns):
+  - `/import` — generated-but-unpublished content, grouped by category, with per-row/per-category/all import and a content preview modal.
+  - `/services` — published content, filtered via a "Select Service" dropdown, grouped by category, with per-row unpublish, CSV export, and a preview-only "Slug" column (`app/lib/slug.ts`) showing `/{city}/services/{category}/{service-name}` - not a live route.
+  - The original combined `/publish-content` page was removed in favor of this split (explicit user request).
 - Repo pushed to GitHub: `https://github.com/rakawebmlg-ai/venture27.git` (`main`), with root `.gitignore` excluding `node_modules/`, `.env*`, `.next/`.
 
 ## In Progress
@@ -44,8 +47,9 @@ Active Development / Polishing
 - `apps/frontend/app/api/generate/route.ts` ('start' now accepts/forwards `limit`).
 - `apps/backend/src/index.ts` (batched, deterministic pending-item fetch; per-batch progress; fixed job-completion update).
 - `packages/database/prisma/schema.prisma` (added `MasterData.published` / `publishedAt`).
-- New: `apps/frontend/app/publish-content/page.tsx`, `apps/frontend/app/api/publish/route.ts`, `apps/frontend/app/lib/placeholders.ts`.
-- `apps/frontend/app/components/Sidebar.tsx` (added "Publish Content" nav item under Post-Generation).
+- New: `apps/frontend/app/import/page.tsx`, `apps/frontend/app/services/page.tsx`, `apps/frontend/app/api/publish/route.ts`, `apps/frontend/app/lib/placeholders.ts`, `apps/frontend/app/lib/slug.ts`.
+- `apps/frontend/app/components/Sidebar.tsx` (added "Import" and "Service" nav items under Post-Generation; the earlier single "Publish Content" entry no longer exists).
+- Removed `apps/frontend/app/publish-content/page.tsx` (split into `/import` + `/services`).
 
 ## Current Technical Context
 - The project successfully runs via `docker compose up -d` (for DB/Redis) followed by `npm run dev --workspace=@venture27/frontend` and `npm run dev --workspace=@venture27/backend`.
