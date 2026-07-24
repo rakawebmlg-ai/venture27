@@ -10,21 +10,26 @@ const generateQueue = new Queue('generate-content', { connection: redis });
 
 export async function POST(req: Request) {
   try {
-    const { action, categoryId, promptTemplate, aiModel, jobId } = await req.json();
+    const { action, categoryId, promptTemplate, aiModel, jobId, limit } = await req.json();
 
     if (action === 'start') {
       if (!categoryId || !promptTemplate || !aiModel) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
 
-      // Count total items
-      const totalItems = await prisma.masterData.count({
+      // Count total pending items for this category
+      const pendingCount = await prisma.masterData.count({
         where: { categoryId, status: 'pending' }
       });
 
-      if (totalItems === 0) {
+      if (pendingCount === 0) {
         return NextResponse.json({ error: 'No pending items for this category' }, { status: 400 });
       }
+
+      // A positive limit caps this run to the next N pending rows, so the
+      // rest stay 'pending' and can be picked up by another "start" call later.
+      const parsedLimit = typeof limit === 'number' && limit > 0 ? Math.floor(limit) : undefined;
+      const totalItems = parsedLimit ? Math.min(parsedLimit, pendingCount) : pendingCount;
 
       // Create a new Job record
       const jobRecord = await prisma.job.create({
@@ -40,11 +45,12 @@ export async function POST(req: Request) {
         jobId: jobRecord.id,
         categoryId,
         promptTemplate,
-        aiModel
+        aiModel,
+        limit: totalItems
       });
 
       return NextResponse.json(jobRecord);
-    } 
+    }
     
     if (action === 'pause') {
       const job = await prisma.job.update({

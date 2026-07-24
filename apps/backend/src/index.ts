@@ -30,13 +30,14 @@ interface GenerationJobPayload {
   categoryId: number;
   promptTemplate: string;
   aiModel: string;
+  limit?: number;
 }
 
 // BullMQ Worker
 const worker = new Worker<GenerationJobPayload>(
   'generate-content',
   async (job: Job<GenerationJobPayload>) => {
-    const { jobId, categoryId, promptTemplate, aiModel } = job.data;
+    const { jobId, categoryId, promptTemplate, aiModel, limit } = job.data;
     console.log(`[Job ${job.id}] Started AI Generation for Database Job ID: ${jobId}`);
 
     const settings = await getSettings();
@@ -59,14 +60,18 @@ const worker = new Worker<GenerationJobPayload>(
       throw new Error(`Unsupported AI model: ${aiModel}`);
     }
 
-    // Fetch all pending combinations for this category
+    // Fetch pending combinations for this category, capped at `limit` so a run
+    // only processes the next N rows and leaves the rest 'pending' for a later run.
     const pendingItems = await prisma.masterData.findMany({
       where: { categoryId, status: 'pending' },
-      include: { location: true, service: true, category: true }
+      include: { location: true, service: true, category: true },
+      orderBy: { id: 'asc' },
+      ...(limit ? { take: limit } : {})
     });
 
     if (pendingItems.length === 0) {
       console.log('No pending items found.');
+      await prisma.job.update({ where: { id: jobId }, data: { status: 'completed', progress: 100 } });
       return;
     }
 
@@ -76,16 +81,21 @@ const worker = new Worker<GenerationJobPayload>(
       data: { status: 'running' }
     });
 
+    let attemptedCount = 0;
+    let ranToCompletion = true;
+
     for (const item of pendingItems) {
       // Check if job was paused or stopped
       const currentJob = await prisma.job.findUnique({ where: { id: jobId } });
-      if (!currentJob) break;
+      if (!currentJob) { ranToCompletion = false; break; }
       if (currentJob.status === 'stopped') {
         console.log(`Job ${jobId} was stopped.`);
+        ranToCompletion = false;
         break;
       }
       if (currentJob.status === 'paused') {
         console.log(`Job ${jobId} was paused. Worker will skip remaining items, to be resumed later.`);
+        ranToCompletion = false;
         break; // Stop processing, resume will create a new worker run
       }
 
@@ -115,19 +125,6 @@ const worker = new Worker<GenerationJobPayload>(
             image: `${item.location.city.toLowerCase()}-${item.service.name.toLowerCase().replace(/\s+/g, '-')}.jpg`
           }
         });
-
-        // Update Job Progress
-        const generatedCount = await prisma.masterData.count({ where: { categoryId, status: 'generated' } });
-        const progress = Math.min(100, Math.floor((generatedCount / currentJob.totalItems) * 100));
-        
-        await prisma.job.update({
-          where: { id: jobId },
-          data: { progress }
-        });
-        
-        // Wait to avoid rate limits
-        await new Promise(r => setTimeout(r, 1000));
-        
       } catch (err: any) {
         console.error(`Error generating for ID ${item.id}:`, err);
         await prisma.masterData.update({
@@ -135,14 +132,31 @@ const worker = new Worker<GenerationJobPayload>(
           data: { status: 'error' }
         });
       }
-    }
 
-    // Check final job status
-    const finalJob = await prisma.job.findUnique({ where: { id: jobId } });
-    if (finalJob && finalJob.progress >= 100) {
+      // Progress is scoped to this run's batch (attempted, not just successful,
+      // so a single failed item doesn't stall the bar or block completion) rather
+      // than the whole category's lifetime generated count.
+      attemptedCount++;
+      const progress = Math.min(100, Math.floor((attemptedCount / pendingItems.length) * 100));
       await prisma.job.update({
         where: { id: jobId },
-        data: { status: 'completed', completedAt: new Date() }
+        data: { progress }
+      });
+
+      // Wait to avoid rate limits
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Only flip to 'completed' if the batch actually ran to the end (not paused/stopped
+    // mid-way) and the job wasn't paused/stopped by the time we got here.
+    const finalJob = await prisma.job.findUnique({ where: { id: jobId } });
+    if (finalJob && finalJob.status === 'running' && ranToCompletion) {
+      // Note: `completedAt` is not a field on the Job model - do not add it here
+      // without a matching schema migration, or this update throws and the job
+      // silently never reaches 'completed' status.
+      await prisma.job.update({
+        where: { id: jobId },
+        data: { status: 'completed', progress: 100 }
       });
       console.log(`Job ${jobId} completed fully.`);
     }

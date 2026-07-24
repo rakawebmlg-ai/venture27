@@ -12,6 +12,7 @@ export default function GenerateContentPage() {
   const [aiModel, setAiModel] = useState('gpt-4o');
   const [enableSmtp, setEnableSmtp] = useState(true);
   const [promptContent, setPromptContent] = useState('');
+  const [limit, setLimit] = useState('');
   
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +69,12 @@ export default function GenerateContentPage() {
 
   const startGeneration = async () => {
     if (pendingData.length === 0) return alert('No pending data to generate');
-    
+
+    const parsedLimit = limit.trim() ? parseInt(limit, 10) : undefined;
+    if (limit.trim() && (!parsedLimit || parsedLimit <= 0)) {
+      return alert('Limit must be a positive number');
+    }
+
     // Pick the category of the first pending item for simplicity
     const categoryId = pendingData[0].categoryId;
 
@@ -84,14 +90,21 @@ export default function GenerateContentPage() {
           action: 'start',
           categoryId,
           promptTemplate: promptContent,
-          aiModel
+          aiModel,
+          limit: parsedLimit
         })
       });
       const job = await res.json();
+      if (!res.ok) {
+        alert(job.error || 'Failed to start generation');
+        setIsGenerating(false);
+        return;
+      }
       setJobId(job.id);
     } catch (e) {
       console.error(e);
       alert('Failed to start generation');
+      setIsGenerating(false);
     }
   };
 
@@ -227,6 +240,22 @@ export default function GenerateContentPage() {
                 <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Configure in <a href="/settings" style={{ color: 'var(--color-blue-400)' }}>Settings</a></div>
               </div>
             </div>
+
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label className="form-label">Limit (rows to generate this run)</label>
+              <input
+                type="number"
+                min={1}
+                className="form-input"
+                placeholder={`Leave empty to generate all ${pendingData.length} pending`}
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+                disabled={isGenerating && !isPaused}
+              />
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                Generate only the next N pending rows now. Run generation again later to continue with the rest.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -243,14 +272,16 @@ export default function GenerateContentPage() {
 
             <div style={{ display: 'flex', gap: '12px' }}>
               {!isGenerating || (isGenerating && progress >= 100) ? (
-                <button 
-                  className="btn btn-primary btn-lg" 
+                <button
+                  className="btn btn-primary btn-lg"
                   style={{ flex: 1, justifyContent: 'center' }}
                   onClick={startGeneration}
                   disabled={!promptUploaded || pendingData.length === 0}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  Start Generation
+                  {completedData.length > 0 && pendingData.length > 0
+                    ? `Continue Generation (${pendingData.length} remaining)`
+                    : 'Start Generation'}
                 </button>
               ) : (
                 <>
