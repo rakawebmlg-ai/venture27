@@ -7,7 +7,8 @@
 Active Development / Polishing
 
 ## Current Objective
-Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province}}` placeholders in Service CSV meta columns now render per-location, and re-uploading a Service CSV updates its stored template instead of being silently ignored.
+1. Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province}}` placeholders in Service CSV meta columns now render per-location, re-uploading a Service CSV updates its stored template instead of being silently ignored, and rows/categories can now be deleted.
+2. Added a batch "Limit" to `/generate-content` so a run can be capped to N rows and continued later; fixed two BullMQ worker bugs that were blocking that (per-batch progress, a job-completion update that referenced a non-existent field).
 
 ## Completed
 - Next.js UI pages (`/`, `/master-data`, `/generate-content`, `/settings`).
@@ -17,6 +18,8 @@ Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province
 - Dynamic prompt injection (`{{city}}`, `{{province}}`, `{{service_name}}`, `{{category}}`).
 - Job Pause/Resume/Stop logic.
 - Master Data generate: `{{City}}`/`{{Province}}` interpolation in Meta Title/Description/Heading/Subheading, service-template refresh on re-upload, tolerant CSV header parsing (whitespace/BOM), and clear zero-result feedback in the UI.
+- Master Data delete: per-row and per-category deletion, both API (`DELETE /api/master-data`) and UI.
+- Generate Content batch limit: cap a run to the next N pending rows via a new "Limit" field; Start button becomes "Continue Generation (N remaining)" for subsequent batches. Backend worker batches deterministically (`orderBy: id asc` + `take: limit`) and reports progress per-batch.
 - Repo pushed to GitHub: `https://github.com/rakawebmlg-ai/venture27.git` (`main`), with root `.gitignore` excluding `node_modules/`, `.env*`, `.next/`.
 
 ## In Progress
@@ -32,12 +35,15 @@ Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province
 - None.
 
 ## Recently Modified Areas
-- `apps/frontend/app/api/master-data/route.ts` (placeholder rendering, service template upsert, CSV parsing robustness, richer POST response).
-- `apps/frontend/app/master-data/page.tsx` (informative post-generate alert).
+- `apps/frontend/app/api/master-data/route.ts` (placeholder rendering, service template upsert, CSV parsing robustness, richer POST response, DELETE endpoint).
+- `apps/frontend/app/master-data/page.tsx` (informative post-generate alert, delete UI).
+- `apps/frontend/app/generate-content/page.tsx` (Limit input, Continue-labeled button).
+- `apps/frontend/app/api/generate/route.ts` ('start' now accepts/forwards `limit`).
+- `apps/backend/src/index.ts` (batched, deterministic pending-item fetch; per-batch progress; fixed job-completion update).
 
 ## Current Technical Context
 - The project successfully runs via `docker compose up -d` (for DB/Redis) followed by `npm run dev --workspace=@venture27/frontend` and `npm run dev --workspace=@venture27/backend`.
-- Verified locally this session: Docker containers `venture27-db` (Postgres) and `venture27-redis` were already running; frontend dev server on port 3000, backend health server on port 3001. Master Data generate flow was tested end-to-end via direct API calls (upload CSVs with `{{City}}`/`{{Province}}` placeholders → confirmed per-location rendering in `GET /api/master-data`, confirmed service-template refresh on re-upload, confirmed skip-reason counts on a bad-header CSV). Test data was cleaned up from the DB afterward.
+- Verified locally this session: Docker containers `venture27-db` (Postgres) and `venture27-redis` were already running; frontend dev server on port 3000, backend health server on port 3001. Master Data generate/delete flows and the Generate Content batch-limit flow were all tested end-to-end via direct API calls against the live DB, using throwaway test categories and (for the AI generation test) a deliberately invalid OpenAI key so no real spend occurred. Test data and the temporary key were cleaned up afterward; the user's real 260-row "Service 1" category was untouched throughout.
 
 ## Current Errors
 - None known.
@@ -45,11 +51,14 @@ Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province
 ## Known Problems
 - The `generate-content` UI polls for job progress. WebSockets could be more efficient in the future.
 - `npx prisma db push` / `prisma generate` in `packages/database` fails with `EPERM` on the query engine `.dll` while dev servers are running (Windows file lock). Stop `npm run dev` first if you need to regenerate the Prisma client after a schema change.
+- `apps/backend`'s `npm run dev` (`tsx src/index.ts`, no watch mode) does not hot-reload on save - must be manually restarted after editing `apps/backend/src/index.ts`.
+- Pause/Resume on `/generate-content` is still broken (`resume` never re-enqueues a BullMQ job - see SESSION_HANDOVER.md). The new Limit/Continue flow avoids relying on it.
 
 ## Next Recommended Action
 - Implement the actual SMTP email sending logic in the BullMQ worker when a job reaches 100%.
 - Build out `/result-guide`.
 - Consider removing `apps/frontend/worker.ts` (dead pg-boss code) to avoid future confusion.
+- Fix or remove the Pause/Resume buttons on `/generate-content` since Resume is currently a no-op.
 
 ## Important Notes For The Next AI
 - The codebase was just refactored into a Monorepo. Do NOT attempt to move it back to a standard structure.
