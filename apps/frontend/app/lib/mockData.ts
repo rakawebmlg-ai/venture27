@@ -45,6 +45,7 @@ export const generationJobs = [
     services_count: 12,
     locations_scope: 'All locations',
     email_notification: true,
+    error_message: null as string | null,
   }
 ];
 

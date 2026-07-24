@@ -44,12 +44,12 @@ export default function ImportPage() {
     (item.category && item.category.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const groupedData = filteredData.reduce((acc, item) => {
+  const groupedData = filteredData.reduce<Record<string, typeof filteredData>>((acc, item) => {
     const cName = item.category?.name || 'Uncategorized';
     if (!acc[cName]) acc[cName] = [];
     acc[cName].push(item);
     return acc;
-  }, {} as Record<string, typeof filteredData>);
+  }, {});
 
   const toggleGroup = (groupName: string) => {
     setExpandedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));

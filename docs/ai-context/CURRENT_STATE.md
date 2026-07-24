@@ -7,6 +7,7 @@
 Active Development / Polishing
 
 ## Current Objective
+-7. Fixed TS "red indicator" errors the user flagged across several files (`di beberapa file ada indicator merah`). Root cause: `array.reduce((acc, item) => {...}, {} as Record<...>)` on an `any[]`-typed array hits a TS generic-inference bug where the callback's `acc`/the final result infers as `unknown` instead of the cast type (confirmed via an isolated repro - moving the initial value to an explicit `as` cast, as opposed to passing an explicit generic, defeats inference here). Fix: use an explicit generic on `reduce`, e.g. `filteredData.reduce<Record<string, typeof filteredData>>((acc, item) => {...}, {})`, dropping the trailing `as` cast. Applied to `app/import/page.tsx`, `app/master-data/page.tsx`, `app/generate-content/page.tsx` (both reduces), `app/components/ServiceListPage.tsx`. Two unrelated errors also found and fixed while running a full `tsc --noEmit`: `app/history/page.tsx` referenced `job.error_message` which didn't exist on the mock job type (added the field to `app/lib/mockData.ts`); `apps/frontend/worker.ts` (dead pg-boss code, previously flagged in Pending) failed to type-check on a missing `pg-boss` dependency - confirmed unused anywhere (not in any `package.json` script, not imported by any file) and deleted outright rather than fixed. `npx tsc --noEmit -p tsconfig.json` is now fully clean.
 -6. SEO + sitemap + robots.txt for the public single-service page, per explicit request. Public page gained canonical/OG/Twitter/robots meta (via `metadataBase` now set in root layout, env var `SITE_URL`) and a JSON-LD `Service` block. New chunked sitemap: `app/lib/sitemap.ts#getSitemapChunks()` groups published rows by slug type (city/community/county) into <=10,000-URL chunks named `{type}-{start}-{end}.xml`; `GET /sitemap-index.xml` lists them, `GET /sitemaps/{filename}` serves one. `app/robots.ts` disallows everything except `/city/`, `/community/`, `/county/` and points at the sitemap index.
 -5. Restructured Service navigation and the public slug format, per explicit follow-up ("rubah saja menjadi sub... slugnya akan disesuaikan"). `/services` no longer exists as one page with in-page grouping - it's now three sidebar sub-menu items (`/services/city`, `/services/community`, `/services/county`, each a thin wrapper around new `app/components/ServiceListPage.tsx`), and `/services` itself redirects to `/services/city`. The public page slug changed from `/{place}/services/{category}/{service}` to `/{type}/services/{value}/{service-name}/{heading}` (type = whichever of city/community/county is primary - see `lib/location.ts#primaryLocationType` - Category dropped, a rendered Heading segment added). The old `app/[city]/services/[category]/[service]/page.tsx` route was deleted and replaced by `app/[type]/services/[value]/[service]/[heading]/page.tsx`. One real published row had an old-format slug; migrated it with a one-off script (not part of the app) - see SESSION_HANDOVER.md.
 -4. `/services` gained a "Group by" tab row (Category / City / Community / County) - switching it re-groups the same table by that field instead of always Category, so each city/community/county shows up as its own expandable "sub service" section, per explicit user request.
@@ -43,7 +44,6 @@ Active Development / Polishing
 - Authentication system (if required).
 - Deployment pipeline to production (Netlify/Vercel/Docker).
 - Real SMTP email dispatch upon job completion (currently setting is saved but email is not actually sent).
-- Dead code cleanup: `apps/frontend/worker.ts` uses `pg-boss` against a queue the real BullMQ worker (`apps/backend/src/index.ts`) never talks to — it can never receive jobs from `apps/frontend/app/api/generate/route.ts`.
 
 ## Blocked
 - None.
@@ -97,7 +97,6 @@ Active Development / Polishing
 ## Next Recommended Action
 - Implement the actual SMTP email sending logic in the BullMQ worker when a job reaches 100%.
 - `/result-guide` is now doubly stale: it was already a static mockup describing a different URL shape, and item -6 above just implemented a REAL sitemap/robots.txt system that makes that page's hardcoded "sitemap-index.xml, state-1-10000.xml, ..." example content redundant/inconsistent with what's actually being served. Worth rewriting it to describe the real, current system instead of a fictional one.
-- Consider removing `apps/frontend/worker.ts` (dead pg-boss code) to avoid future confusion.
 - Fix or remove the Pause/Resume buttons on `/generate-content` since Resume is currently a no-op.
 - Set a real `SITE_URL` env var before deploying anywhere other than localhost, or canonical/OG URLs and metadataBase-resolved links will point at `http://localhost:3000`.
 

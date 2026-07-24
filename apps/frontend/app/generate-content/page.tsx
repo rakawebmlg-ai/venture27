@@ -106,14 +106,14 @@ export default function GenerateContentPage() {
   };
 
   const categoryOptions = Object.values(
-    data.reduce((acc, item) => {
+    data.reduce<Record<number, { id: number; name: string; pending: number; total: number }>>((acc, item) => {
       const id = item.categoryId;
       const name = item.category?.name || 'Uncategorized';
       if (!acc[id]) acc[id] = { id, name, pending: 0, total: 0 };
       acc[id].total++;
       if (item.status === 'pending') acc[id].pending++;
       return acc;
-    }, {} as Record<number, { id: number; name: string; pending: number; total: number }>)
+    }, {})
   ).sort((a, b) => a.name.localeCompare(b.name));
 
   // Default to the first category with pending work once data loads; never
@@ -128,12 +128,12 @@ export default function GenerateContentPage() {
   const completedData = data.filter(d => d.status === 'generated');
   const categoryCompletedData = completedData.filter(d => d.categoryId === selectedCategoryId);
 
-  const groupedData = data.reduce((acc, item) => {
+  const groupedData = data.reduce<Record<string, typeof data>>((acc, item) => {
     const cName = item.category?.name || 'Uncategorized';
     if (!acc[cName]) acc[cName] = [];
     acc[cName].push(item);
     return acc;
-  }, {} as Record<string, typeof data>);
+  }, {});
 
   const toggleGroup = (groupName: string) => {
     setExpandedGroups(prev => ({
