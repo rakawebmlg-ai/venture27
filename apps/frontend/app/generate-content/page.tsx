@@ -262,7 +262,8 @@ export default function GenerateContentPage() {
                 >
                   <option value="gpt-4o">GPT-4o (OpenAI)</option>
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Anthropic)</option>
-                  <option value="gemini-1-5-pro">Gemini 1.5 Pro (Google)</option>
+                  <option value="gemini-flash-latest">Gemini Flash (Google)</option>
+                  <option value="gemini-pro-latest">Gemini Pro (Google)</option>
                 </select>
               </div>
 

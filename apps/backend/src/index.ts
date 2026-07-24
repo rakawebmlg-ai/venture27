@@ -24,6 +24,22 @@ async function getSettings() {
   return settings;
 }
 
+// The <select> in the Generate Content UI sends these short values as
+// `aiModel`, but the actual provider SDKs need their real, versioned model
+// IDs (Anthropic requires a dated snapshot; Google's SDK here requires a
+// `models/` prefix and dots, not hyphens, in the version number) - passing
+// the short value straight through makes every request fail with a
+// model-not-found error, so every row silently ends up 'error'.
+const MODEL_IDS: Record<string, string> = {
+  'gpt-4o': 'gpt-4o',
+  'claude-3-5-sonnet': 'claude-3-5-sonnet-20240620',
+  // 'gemini-1.5-pro' was retired by Google - '-latest' aliases always point
+  // at Google's current recommended model for that tier, so these shouldn't
+  // go stale the same way.
+  'gemini-flash-latest': 'models/gemini-flash-latest',
+  'gemini-pro-latest': 'models/gemini-pro-latest',
+};
+
 // Job Payload Types
 interface GenerationJobPayload {
   jobId: number;
@@ -43,19 +59,22 @@ const worker = new Worker<GenerationJobPayload>(
     const settings = await getSettings();
 
     // Setup AI provider
+    const modelId = MODEL_IDS[aiModel] || (aiModel.startsWith('gpt-') ? aiModel : undefined);
+    if (!modelId) throw new Error(`Unsupported AI model: ${aiModel}`);
+
     let aiProvider: any;
     if (aiModel === 'gpt-4o' || aiModel.startsWith('gpt-')) {
       if (!settings.openaiKey) throw new Error('OpenAI API Key not configured');
       const openai = createOpenAI({ apiKey: settings.openaiKey });
-      aiProvider = openai(aiModel);
+      aiProvider = openai(modelId);
     } else if (aiModel === 'claude-3-5-sonnet') {
       if (!settings.anthropicKey) throw new Error('Anthropic API Key not configured');
       const anthropic = createAnthropic({ apiKey: settings.anthropicKey });
-      aiProvider = anthropic(aiModel);
-    } else if (aiModel === 'gemini-1-5-pro') {
+      aiProvider = anthropic(modelId);
+    } else if (aiModel.startsWith('gemini-')) {
       if (!settings.geminiKey) throw new Error('Gemini API Key not configured');
       const google = createGoogleGenerativeAI({ apiKey: settings.geminiKey });
-      aiProvider = google(aiModel);
+      aiProvider = google(modelId);
     } else {
       throw new Error(`Unsupported AI model: ${aiModel}`);
     }
