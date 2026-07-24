@@ -7,6 +7,7 @@
 Active Development / Polishing
 
 ## Current Objective
+-6. SEO + sitemap + robots.txt for the public single-service page, per explicit request. Public page gained canonical/OG/Twitter/robots meta (via `metadataBase` now set in root layout, env var `SITE_URL`) and a JSON-LD `Service` block. New chunked sitemap: `app/lib/sitemap.ts#getSitemapChunks()` groups published rows by slug type (city/community/county) into <=10,000-URL chunks named `{type}-{start}-{end}.xml`; `GET /sitemap-index.xml` lists them, `GET /sitemaps/{filename}` serves one. `app/robots.ts` disallows everything except `/city/`, `/community/`, `/county/` and points at the sitemap index.
 -5. Restructured Service navigation and the public slug format, per explicit follow-up ("rubah saja menjadi sub... slugnya akan disesuaikan"). `/services` no longer exists as one page with in-page grouping - it's now three sidebar sub-menu items (`/services/city`, `/services/community`, `/services/county`, each a thin wrapper around new `app/components/ServiceListPage.tsx`), and `/services` itself redirects to `/services/city`. The public page slug changed from `/{place}/services/{category}/{service}` to `/{type}/services/{value}/{service-name}/{heading}` (type = whichever of city/community/county is primary - see `lib/location.ts#primaryLocationType` - Category dropped, a rendered Heading segment added). The old `app/[city]/services/[category]/[service]/page.tsx` route was deleted and replaced by `app/[type]/services/[value]/[service]/[heading]/page.tsx`. One real published row had an old-format slug; migrated it with a one-off script (not part of the app) - see SESSION_HANDOVER.md.
 -4. `/services` gained a "Group by" tab row (Category / City / Community / County) - switching it re-groups the same table by that field instead of always Category, so each city/community/county shows up as its own expandable "sub service" section, per explicit user request.
 -3. `Location.city` is now ALSO optional (was required), per explicit follow-up request - a Location just needs a Province plus at least one of City/Community/County, since generation is meant to combine "whichever of them is set". New `app/lib/location.ts` (`combineLocationName`, `primaryLocationName`) centralizes the "pick/combine whichever fields are set" logic, used for slugs, prompts (backend), confirm dialogs, modal titles, and the public page. Found and fixed a real bug during verification: `renderPlaceholders` (`app/lib/placeholders.ts`) rendered `{{City}}` as the literal text "null" on a row with no city set (JS stringifies `null` when passed to `.replace()`) - now defaults every field to `''`.
@@ -95,9 +96,10 @@ Active Development / Polishing
 
 ## Next Recommended Action
 - Implement the actual SMTP email sending logic in the BullMQ worker when a job reaches 100%.
-- Build out `/result-guide`.
+- `/result-guide` is now doubly stale: it was already a static mockup describing a different URL shape, and item -6 above just implemented a REAL sitemap/robots.txt system that makes that page's hardcoded "sitemap-index.xml, state-1-10000.xml, ..." example content redundant/inconsistent with what's actually being served. Worth rewriting it to describe the real, current system instead of a fictional one.
 - Consider removing `apps/frontend/worker.ts` (dead pg-boss code) to avoid future confusion.
 - Fix or remove the Pause/Resume buttons on `/generate-content` since Resume is currently a no-op.
+- Set a real `SITE_URL` env var before deploying anywhere other than localhost, or canonical/OG URLs and metadataBase-resolved links will point at `http://localhost:3000`.
 
 ## Important Notes For The Next AI
 - The codebase was just refactored into a Monorepo. Do NOT attempt to move it back to a standard structure.
