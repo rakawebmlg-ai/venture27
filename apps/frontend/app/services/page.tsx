@@ -29,8 +29,6 @@ export default function ServicesPage() {
     }
   };
 
-  // Default to the first service with published content once data loads;
-  // never override a selection the user already made.
   const serviceOptions = Array.from(
     data.reduce((acc, item) => {
       const name = item.service?.name || 'Unnamed';
@@ -39,11 +37,10 @@ export default function ServicesPage() {
     }, new Map<string, number>())
   ).sort((a, b) => a[0].localeCompare(b[0]));
 
-  useEffect(() => {
-    if (selectedService !== '' || serviceOptions.length === 0) return;
-    setSelectedService(serviceOptions[0][0]);
-  }, [data]);
-
+  // Default to "All Services" so everything just imported is visible right
+  // away - auto-picking one service here previously hid the rest of what was
+  // imported behind a filter the user never chose, making it look like an
+  // "Import All" had silently dropped most of the content.
   const scopedData = selectedService ? data.filter((d) => (d.service?.name || 'Unnamed') === selectedService) : data;
 
   const filteredData = scopedData.filter((item) =>
