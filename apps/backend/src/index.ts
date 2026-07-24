@@ -159,10 +159,17 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
         // and tends to echo back or get confused by.
         const city = item.location.city;
         const province = item.location.province;
+        const community = item.location.community || '';
+        const county = item.location.county || '';
         const substitutions: [RegExp, string][] = [
           [/\{\{\s*city\s*\}\}/gi, city],
           [/\{\{\s*province\s*\}\}/gi, province],
-          [/\{\{\s*city\s*\/\s*community\s*\}\}/gi, city],
+          [/\{\{\s*community\s*\}\}/gi, community],
+          [/\{\{\s*county\s*\}\}/gi, county],
+          // City/Community historically meant "whichever local-area name
+          // applies" - now that Community is its own field, prefer it when
+          // set and fall back to City.
+          [/\{\{\s*city\s*\/\s*community\s*\}\}/gi, community || city],
           [/\{\{\s*service[_\s]?name\s*\}\}/gi, item.service.name],
           [/\{\{\s*category\s*\}\}/gi, item.category?.name || ''],
           [/\{\{\s*meta[_\s]?title\s*\}\}/gi, renderMetaField(item.service.metaTitle, city, province)],

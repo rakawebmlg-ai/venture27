@@ -396,7 +396,7 @@ export default function GenerateContentPage() {
                 disabled={isGenerating && !isPaused}
               />
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', lineHeight: 1.8 }}>
-                Available variables: <code>{'{{city}}'}</code> / <code>{'{{City/Community}}'}</code> <code>{'{{province}}'}</code> <code>{'{{service_name}}'}</code> / <code>{'{{Service Name}}'}</code> <code>{'{{category}}'}</code> <code>{'{{Meta Title}}'}</code> <code>{'{{Meta Description}}'}</code> <code>{'{{Heading}}'}</code> <code>{'{{Subheading}}'}</code> <code>{'{{No}}'}</code>
+                Available variables: <code>{'{{city}}'}</code> <code>{'{{community}}'}</code> <code>{'{{county}}'}</code> <code>{'{{province}}'}</code> <code>{'{{service_name}}'}</code> / <code>{'{{Service Name}}'}</code> <code>{'{{category}}'}</code> <code>{'{{Meta Title}}'}</code> <code>{'{{Meta Description}}'}</code> <code>{'{{Heading}}'}</code> <code>{'{{Subheading}}'}</code> <code>{'{{No}}'}</code>
               </div>
             </div>
 
@@ -572,7 +572,9 @@ export default function GenerateContentPage() {
             <thead>
               <tr>
                 <th style={{ width: '40px' }}>No</th>
-                <th>City/Community</th>
+                <th>City</th>
+                <th>Community</th>
+                <th>County</th>
                 <th>Province</th>
                 <th>Service Name</th>
                 <th>Meta Title</th>
@@ -583,7 +585,7 @@ export default function GenerateContentPage() {
               </tr>
             </thead>
             {loading ? (
-               <tbody><tr><td colSpan={9} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
+               <tbody><tr><td colSpan={11} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName];
@@ -594,7 +596,7 @@ export default function GenerateContentPage() {
                       onClick={() => toggleGroup(groupName)}
                       style={{ cursor: 'pointer', background: 'var(--color-bg-secondary)', transition: 'background 0.2s' }}
                     >
-                      <td colSpan={9} style={{ padding: '12px 20px' }}>
+                      <td colSpan={11} style={{ padding: '12px 20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <svg
@@ -637,6 +639,8 @@ export default function GenerateContentPage() {
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
                         <td>{item.location?.city}</td>
+                        <td>{item.location?.community || '-'}</td>
+                        <td>{item.location?.county || '-'}</td>
                         <td>{item.location?.province}</td>
                         <td>{item.service?.name}</td>
                         <td><span title={item.service?.metaTitle || ''} style={{ display: 'inline-block', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.service?.metaTitle || '-'}</span></td>
@@ -681,7 +685,7 @@ export default function GenerateContentPage() {
             ) : (
               <tbody>
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={11}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📂</div>
                       <div className="empty-state-title">No data found</div>

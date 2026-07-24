@@ -15,9 +15,8 @@ export async function generateMetadata({ params }) {
   const item = await getPage(city, category, service);
   if (!item) return {};
 
-  const { city: cityName, province } = item.location;
-  const metaTitle = renderPlaceholders(item.service.metaTitle, cityName, province) || item.service.name;
-  const metaDescription = renderPlaceholders(item.service.metaDescription, cityName, province) || undefined;
+  const metaTitle = renderPlaceholders(item.service.metaTitle, item.location) || item.service.name;
+  const metaDescription = renderPlaceholders(item.service.metaDescription, item.location) || undefined;
 
   return {
     title: metaTitle,
@@ -30,9 +29,10 @@ export default async function ProgrammaticPage({ params }) {
   const item = await getPage(city, category, service);
   if (!item) notFound();
 
-  const { city: cityName, province } = item.location;
-  const heading = renderPlaceholders(item.service.heading, cityName, province) || item.service.name;
-  const subheading = renderPlaceholders(item.service.subheading, cityName, province);
+  const { city: cityName, community, county, province } = item.location;
+  const locationLabel = [cityName, community, county].filter(Boolean).join(', ');
+  const heading = renderPlaceholders(item.service.heading, item.location) || item.service.name;
+  const subheading = renderPlaceholders(item.service.subheading, item.location);
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0e14', color: '#e5e7eb' }}>
@@ -45,7 +45,7 @@ export default async function ProgrammaticPage({ params }) {
 
       <main style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px 80px' }}>
         <div style={{ fontSize: '13px', color: '#3b82f6', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '12px', textTransform: 'uppercase' }}>
-          {cityName}, {province}
+          {locationLabel}, {province}
         </div>
 
         {/* If the generated content already includes its own <h1> (most
@@ -65,7 +65,7 @@ export default async function ProgrammaticPage({ params }) {
         />
 
         <footer style={{ marginTop: '56px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: '#6b7280' }}>
-          {item.service?.name} &middot; {cityName}, {province}
+          {item.service?.name} &middot; {locationLabel}, {province}
         </footer>
       </main>
 

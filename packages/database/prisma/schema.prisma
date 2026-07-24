@@ -32,12 +32,14 @@ model Category {
 model Location {
   id        Int          @id @default(autoincrement())
   city      String
+  community String?
+  county    String?
   province  String
   data      MasterData[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  @@unique([city, province])
+  @@unique([city, community, county, province])
 }
 
 model Service {

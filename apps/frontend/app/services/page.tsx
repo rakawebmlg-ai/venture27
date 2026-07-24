@@ -51,6 +51,8 @@ export default function ServicesPage() {
 
   const filteredData = scopedData.filter((item) =>
     item.location?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.community?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.county?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.province.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.category && item.category.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -91,11 +93,13 @@ export default function ServicesPage() {
   };
 
   const exportCSV = (cName: string, items: typeof filteredData) => {
-    const headers = ['No', 'Category', 'City/Community/County', 'Province', 'Service Name', 'Slug', 'Published At'];
+    const headers = ['No', 'Category', 'City', 'Community', 'County', 'Province', 'Service Name', 'Slug', 'Published At'];
     const rows = items.map((item, idx) => [
       idx + 1,
       `"${item.category?.name || ''}"`,
       `"${item.location?.city || ''}"`,
+      `"${item.location?.community || ''}"`,
+      `"${item.location?.county || ''}"`,
       `"${item.location?.province || ''}"`,
       `"${item.service?.name || ''}"`,
       `"${slugFor(item)}"`,
@@ -141,7 +145,7 @@ export default function ServicesPage() {
             <input
               type="text"
               className="form-input"
-              placeholder="Search by city, province, category..."
+              placeholder="Search by city, community, county, province, category..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ width: '280px' }}
@@ -160,7 +164,9 @@ export default function ServicesPage() {
             <thead>
               <tr>
                 <th style={{ width: '40px' }}>No</th>
-                <th>City/Community/County</th>
+                <th>City</th>
+                <th>Community</th>
+                <th>County</th>
                 <th>Province</th>
                 <th>Category</th>
                 <th>Slug</th>
@@ -169,7 +175,7 @@ export default function ServicesPage() {
               </tr>
             </thead>
             {loading ? (
-              <tbody><tr><td colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>Loading...</td></tr></tbody>
+              <tbody><tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>Loading...</td></tr></tbody>
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName] ?? true;
@@ -180,7 +186,7 @@ export default function ServicesPage() {
                       onClick={() => toggleGroup(groupName)}
                       style={{ cursor: 'pointer', background: 'var(--color-bg-secondary)', transition: 'background 0.2s' }}
                     >
-                      <td colSpan={7} style={{ padding: '12px 20px' }}>
+                      <td colSpan={9} style={{ padding: '12px 20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <svg
@@ -208,6 +214,8 @@ export default function ServicesPage() {
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
                         <td>{item.location?.city}</td>
+                        <td>{item.location?.community || '-'}</td>
+                        <td>{item.location?.county || '-'}</td>
                         <td>{item.location?.province}</td>
                         <td>{item.category?.name}</td>
                         <td>
@@ -240,7 +248,7 @@ export default function ServicesPage() {
             ) : (
               <tbody>
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={9}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📂</div>
                       <div className="empty-state-title">No data found</div>

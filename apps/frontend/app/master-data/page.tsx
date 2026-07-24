@@ -44,6 +44,8 @@ export default function MasterDataPage() {
 
   const filteredData = data.filter((item) =>
     item.location?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.community?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.county?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.service?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.province.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.category && item.category.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -169,11 +171,13 @@ export default function MasterDataPage() {
   };
 
   const exportCSV = (cName: string, items: typeof filteredData) => {
-    const headers = ['No', 'Category', 'City/Community', 'Province', 'Service Name', 'Meta Title', 'Meta Description', 'Heading', 'Subheading', 'Content Status', 'Image Status'];
+    const headers = ['No', 'Category', 'City', 'Community', 'County', 'Province', 'Service Name', 'Meta Title', 'Meta Description', 'Heading', 'Subheading', 'Content Status', 'Image Status'];
     const rows = items.map((item, idx) => [
       idx + 1,
       `"${item.category?.name || ''}"`,
       `"${item.location?.city || ''}"`,
+      `"${item.location?.community || ''}"`,
+      `"${item.location?.county || ''}"`,
       `"${item.location?.province || ''}"`,
       `"${item.service?.name || ''}"`,
       `"${item.service?.metaTitle || ''}"`,
@@ -240,7 +244,9 @@ export default function MasterDataPage() {
             <thead>
               <tr>
                 <th style={{ width: '40px' }}>No</th>
-                <th>City/Community</th>
+                <th>City</th>
+                <th>Community</th>
+                <th>County</th>
                 <th>Province</th>
                 <th>Service Name</th>
                 <th>Meta Title</th>
@@ -251,7 +257,7 @@ export default function MasterDataPage() {
               </tr>
             </thead>
             {loading ? (
-               <tbody><tr><td colSpan={9} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
+               <tbody><tr><td colSpan={11} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName];
@@ -262,7 +268,7 @@ export default function MasterDataPage() {
                       onClick={() => toggleGroup(groupName)}
                       style={{ cursor: 'pointer', background: 'var(--color-bg-secondary)', transition: 'background 0.2s' }}
                     >
-                      <td colSpan={9} style={{ padding: '12px 20px' }}>
+                      <td colSpan={11} style={{ padding: '12px 20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <svg
@@ -301,6 +307,8 @@ export default function MasterDataPage() {
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
                         <td>{item.location?.city}</td>
+                        <td>{item.location?.community || '-'}</td>
+                        <td>{item.location?.county || '-'}</td>
                         <td>{item.location?.province}</td>
                         <td>{item.service?.name}</td>
                         <td><span title={item.service?.metaTitle || ''} style={{ display: 'inline-block', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.service?.metaTitle || '-'}</span></td>
@@ -337,7 +345,7 @@ export default function MasterDataPage() {
             ) : (
               <tbody>
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={11}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📂</div>
                       <div className="empty-state-title">No data found</div>
@@ -387,7 +395,7 @@ export default function MasterDataPage() {
                 {/* Location Upload */}
                 <div>
                   <label className="form-label">1. Locations (CSV)</label>
-                  <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Req: City, Province</p>
+                  <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Req: City, Province. Optional: Community, County</p>
                   
                   {locUploaded ? (
                     <div style={{ padding: '16px', background: 'var(--color-success-bg)', border: '1px solid var(--color-success)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>

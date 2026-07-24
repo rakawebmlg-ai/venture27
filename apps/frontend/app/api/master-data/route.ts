@@ -12,15 +12,14 @@ export async function GET(req: Request) {
 
     const rendered = data.map((item: any) => {
       if (!item.location || !item.service) return item;
-      const { city, province } = item.location;
       return {
         ...item,
         service: {
           ...item.service,
-          metaTitle: renderPlaceholders(item.service.metaTitle, city, province),
-          metaDescription: renderPlaceholders(item.service.metaDescription, city, province),
-          heading: renderPlaceholders(item.service.heading, city, province),
-          subheading: renderPlaceholders(item.service.subheading, city, province),
+          metaTitle: renderPlaceholders(item.service.metaTitle, item.location),
+          metaDescription: renderPlaceholders(item.service.metaDescription, item.location),
+          heading: renderPlaceholders(item.service.heading, item.location),
+          subheading: renderPlaceholders(item.service.subheading, item.location),
         }
       };
     });
@@ -67,6 +66,10 @@ export async function POST(req: Request) {
     for (const loc of parsedLocations) {
       const city = loc.City || loc.city;
       const province = loc.Province || loc.province;
+      // Community/County are optional - a location can be just a City, or a
+      // City plus one or both of these more specific sub-areas.
+      const community = loc.Community || loc.community || null;
+      const county = loc.County || loc.county || null;
 
       if (!city || !province) {
         skippedLocationRows++;
@@ -74,11 +77,11 @@ export async function POST(req: Request) {
       }
 
       let location = await prisma.location.findFirst({
-        where: { city, province }
+        where: { city, community, county, province }
       });
 
       if (!location) {
-        location = await prisma.location.create({ data: { city, province } });
+        location = await prisma.location.create({ data: { city, community, county, province } });
       }
 
       for (const srv of validServices) {

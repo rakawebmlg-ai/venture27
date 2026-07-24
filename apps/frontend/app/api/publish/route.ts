@@ -13,15 +13,14 @@ export async function GET(req: Request) {
 
     const rendered = data.map((item: any) => {
       if (!item.location || !item.service) return item;
-      const { city, province } = item.location;
       return {
         ...item,
         service: {
           ...item.service,
-          metaTitle: renderPlaceholders(item.service.metaTitle, city, province),
-          metaDescription: renderPlaceholders(item.service.metaDescription, city, province),
-          heading: renderPlaceholders(item.service.heading, city, province),
-          subheading: renderPlaceholders(item.service.subheading, city, province),
+          metaTitle: renderPlaceholders(item.service.metaTitle, item.location),
+          metaDescription: renderPlaceholders(item.service.metaDescription, item.location),
+          heading: renderPlaceholders(item.service.heading, item.location),
+          subheading: renderPlaceholders(item.service.subheading, item.location),
         }
       };
     });
