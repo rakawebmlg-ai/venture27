@@ -91,6 +91,7 @@ export default function MasterDataPage() {
           servicesCsv: svcCsvContent
         })
       });
+      const result = await res.json();
       if (res.ok) {
         await fetchData();
         setShowGenerateModal(false);
@@ -99,8 +100,22 @@ export default function MasterDataPage() {
         setCategory('');
         setLocCsvContent('');
         setSvcCsvContent('');
+
+        if (result.count === 0) {
+          const reasons = [];
+          if (result.skippedLocationRows > 0) reasons.push(`${result.skippedLocationRows} location row(s) missing City/Province`);
+          if (result.skippedServiceRows > 0) reasons.push(`${result.skippedServiceRows} service row(s) missing Service Name`);
+          if (result.skippedExistingCombos > 0) reasons.push(`${result.skippedExistingCombos} combination(s) already existed`);
+          alert(
+            reasons.length > 0
+              ? `No new master data was created.\n${reasons.join('\n')}`
+              : 'No new master data was created. Check that your CSV headers match the required columns (City, Province, Service Name).'
+          );
+        } else {
+          alert(`Generated ${result.count} new master data combination(s).`);
+        }
       } else {
-        alert('Failed to generate master data');
+        alert(result.error || 'Failed to generate master data');
       }
     } catch (e) {
       console.error(e);
