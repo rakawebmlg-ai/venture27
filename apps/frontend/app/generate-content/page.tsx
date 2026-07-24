@@ -445,14 +445,18 @@ export default function GenerateContentPage() {
             <thead>
               <tr>
                 <th style={{ width: '40px' }}>No</th>
-                <th>Service & Location</th>
-                <th>Content Status</th>
-                <th>Image Status</th>
+                <th>City/Community</th>
+                <th>Province</th>
+                <th>Service Name</th>
+                <th>Meta Title</th>
+                <th>Heading</th>
+                <th>Content</th>
+                <th>Image</th>
                 <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             {loading ? (
-               <tbody><tr><td colSpan={5} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
+               <tbody><tr><td colSpan={9} style={{textAlign: 'center', padding: '20px'}}>Loading...</td></tr></tbody>
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName];
@@ -463,10 +467,10 @@ export default function GenerateContentPage() {
                       onClick={() => toggleGroup(groupName)}
                       style={{ cursor: 'pointer', background: 'var(--color-bg-secondary)', transition: 'background 0.2s' }}
                     >
-                      <td colSpan={5} style={{ padding: '12px 20px' }}>
+                      <td colSpan={9} style={{ padding: '12px 20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <svg 
+                            <svg
                               width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                               style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.2s', color: 'var(--color-text-muted)' }}
                             >
@@ -505,10 +509,11 @@ export default function GenerateContentPage() {
                     {isExpanded && items.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{item.service?.name}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{item.location?.city}, {item.location?.province}</div>
-                        </td>
+                        <td>{item.location?.city}</td>
+                        <td>{item.location?.province}</td>
+                        <td>{item.service?.name}</td>
+                        <td><span title={item.service?.metaTitle || ''} style={{ display: 'inline-block', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.service?.metaTitle || '-'}</span></td>
+                        <td><span title={item.service?.heading || ''} style={{ display: 'inline-block', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.service?.heading || '-'}</span></td>
                         <td>
                           {item.status === 'generated' ? (
                             <span className="badge badge-success"><span className="badge-dot"></span> Generated</span>
@@ -549,7 +554,7 @@ export default function GenerateContentPage() {
             ) : (
               <tbody>
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={9}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📂</div>
                       <div className="empty-state-title">No data found</div>
