@@ -3,8 +3,13 @@ import { prisma } from '@venture27/database';
 
 export async function GET() {
   try {
-    const locationsCount = await prisma.location.count();
-    const servicesCount = await prisma.service.count();
+    // Location/Service rows are kept as reusable templates even after their
+    // Master Data combinations are deleted (e.g. via "Delete Category"), so a
+    // plain count() includes orphaned rows nothing currently references -
+    // "20 locations" when Master Data is actually empty. Count only rows
+    // that have at least one Master Data combination using them.
+    const locationsCount = await prisma.location.count({ where: { data: { some: {} } } });
+    const servicesCount = await prisma.service.count({ where: { data: { some: {} } } });
     const masterDataCount = await prisma.masterData.count();
     const generatedCount = await prisma.masterData.count({ where: { status: 'generated' } });
     
