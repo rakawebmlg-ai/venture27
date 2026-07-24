@@ -1,0 +1,25 @@
+{
+  "name": "@venture27/backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "worker": "tsx src/worker.ts"
+  },
+  "dependencies": {
+    "@venture27/database": "*",
+    "express": "^4.19.2",
+    "bullmq": "^5.7.9",
+    "ioredis": "^5.4.1",
+    "ai": "^3.2.19",
+    "@ai-sdk/openai": "^0.0.33",
+    "@ai-sdk/anthropic": "^0.0.33",
+    "@ai-sdk/google": "^0.0.26"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.2",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.9"
+  }
+}

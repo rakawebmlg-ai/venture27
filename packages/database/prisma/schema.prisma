@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Settings {
+  id             Int      @id @default(1)
+  smtpHost       String?
+  smtpPort       String?
+  smtpEncryption String?
+  smtpUsername   String?
+  smtpPassword   String?
+  openaiKey      String?
+  anthropicKey   String?
+  geminiKey      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Category {
+  id        Int          @id @default(autoincrement())
+  name      String       @unique
+  data      MasterData[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Location {
+  id        Int          @id @default(autoincrement())
+  city      String
+  province  String
+  data      MasterData[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([city, province])
+}
+
+model Service {
+  id              Int          @id @default(autoincrement())
+  name            String
+  metaTitle       String?
+  metaDescription String?
+  heading         String?
+  subheading      String?
+  data            MasterData[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([name])
+}
+
+model MasterData {
+  id         Int      @id @default(autoincrement())
+  categoryId Int
+  locationId Int
+  serviceId  Int
+  content    String?
+  image      String?
+  status     String   @default("pending") // pending, generated, error
+  
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, locationId, serviceId])
+}
+
+model Job {
+  id           Int      @id @default(autoincrement())
+  status       String   @default("running") // running, paused, stopped, completed
+  progress     Int      @default(0)
+  totalItems   Int      @default(0)
+  errorLogs    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

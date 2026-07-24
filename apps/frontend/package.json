@@ -1,0 +1,25 @@
+{
+  "name": "@venture27/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@venture27/database": "*",
+    "next": "14.2.4",
+    "react": "^18",
+    "react-dom": "^18",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/papaparse": "^5.3.14",
+    "typescript": "^5"
+  }
+}

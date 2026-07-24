@@ -1,0 +1,14 @@
+{
+  "name": "@venture27/database",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@prisma/client": "^5.11.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.11.0"
+  },
+  "scripts": {
+    "build": "prisma generate"
+  }
+}
