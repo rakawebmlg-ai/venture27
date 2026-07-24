@@ -65,6 +65,7 @@ model MasterData {
   errorMessage String?
   published   Boolean   @default(false)
   publishedAt DateTime?
+  slug        String?   @unique
 
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)

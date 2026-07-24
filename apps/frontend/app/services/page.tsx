@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { buildSlugPreview } from '../lib/slug';
+import Link from 'next/link';
+import { buildSlug } from '../lib/slug';
+
+// Rows published before the slug column existed (or that hit a naming
+// collision) may not have one yet - fall back to computing it on the fly
+// so the link/preview still works instead of showing nothing.
+const slugFor = (item: any) => item.slug || buildSlug(item.location?.city || '', item.category?.name || '', item.service?.name || '');
 
 export default function ServicesPage() {
   const [data, setData] = useState<any[]>([]);
@@ -92,7 +98,7 @@ export default function ServicesPage() {
       `"${item.location?.city || ''}"`,
       `"${item.location?.province || ''}"`,
       `"${item.service?.name || ''}"`,
-      `"${buildSlugPreview(item.location?.city || '', item.category?.name || '', item.service?.name || '')}"`,
+      `"${slugFor(item)}"`,
       item.publishedAt ? new Date(item.publishedAt).toISOString() : ''
     ]);
 
@@ -205,15 +211,16 @@ export default function ServicesPage() {
                         <td>{item.location?.province}</td>
                         <td>{item.category?.name}</td>
                         <td>
-                          <code style={{ fontSize: '12px', color: 'var(--color-blue-300)' }}>
-                            {buildSlugPreview(item.location?.city || '', item.category?.name || '', item.service?.name || '')}
-                          </code>
+                          <Link href={slugFor(item)} target="_blank" style={{ fontSize: '12px', color: 'var(--color-blue-300)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}>
+                            {slugFor(item)}
+                          </Link>
                         </td>
                         <td style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                           {item.publishedAt ? new Date(item.publishedAt).toLocaleString() : '-'}
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <Link href={slugFor(item)} target="_blank" className="btn btn-ghost btn-sm">View Page</Link>
                             <button className="btn btn-ghost btn-sm" onClick={() => setPreviewItem(item)}>Preview</button>
                             <button
                               className="btn btn-ghost btn-sm"
@@ -265,9 +272,9 @@ export default function ServicesPage() {
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Slug</div>
-                <code style={{ fontSize: '13px', color: 'var(--color-blue-300)' }}>
-                  {buildSlugPreview(previewItem.location?.city || '', previewItem.category?.name || '', previewItem.service?.name || '')}
-                </code>
+                <Link href={slugFor(previewItem)} target="_blank" style={{ fontSize: '13px', color: 'var(--color-blue-300)', fontFamily: 'var(--font-mono)' }}>
+                  {slugFor(previewItem)}
+                </Link>
               </div>
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Meta Title</div>
@@ -284,6 +291,7 @@ export default function ServicesPage() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setPreviewItem(null)}>Close</button>
+              <Link href={slugFor(previewItem)} target="_blank" className="btn btn-ghost">View Page</Link>
               <button
                 className="btn btn-ghost"
                 style={{ color: 'var(--color-error)' }}

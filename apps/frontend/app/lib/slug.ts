@@ -6,10 +6,11 @@ function slugifyPart(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-// Preview-only slug for the eventual programmatic page URL structure:
+// The programmatic page URL for a given location/category/service combo:
 // /{city}/services/{category}/{service-name}
-// Not a live route yet - just shown so the taxonomy on the Service page
-// reads like the page it will eventually become.
-export function buildSlugPreview(city: string, categoryName: string, serviceName: string): string {
+// Computed once at import time and stored on MasterData.slug (see
+// /api/publish), and matched against the same way by the public page route
+// at app/[city]/services/[category]/[service]/page.tsx.
+export function buildSlug(city: string, categoryName: string, serviceName: string): string {
   return `/${slugifyPart(city)}/services/${slugifyPart(categoryName)}/${slugifyPart(serviceName)}`;
 }

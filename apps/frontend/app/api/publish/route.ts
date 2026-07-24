@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@venture27/database';
 import { renderPlaceholders } from '../../lib/placeholders';
+import { buildSlug } from '../../lib/slug';
 
 export async function GET(req: Request) {
   try {
@@ -58,13 +59,48 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Provide ids or categoryId' }, { status: 400 });
     }
 
-    const { count } = await prisma.masterData.updateMany({
+    if (!publishing) {
+      // Unpublishing doesn't need a per-row slug computation, a plain bulk
+      // update is fine (the slug itself is left in place so re-publishing
+      // later reuses the same URL instead of generating a new one).
+      const { count } = await prisma.masterData.updateMany({
+        where,
+        data: { published: false, publishedAt: null }
+      });
+      return NextResponse.json({ success: true, count });
+    }
+
+    // Importing (publishing) computes a slug per row from its own
+    // location/category/service, so this can't be a single updateMany -
+    // each row needs its own `data`.
+    const rows = await prisma.masterData.findMany({
       where,
-      data: {
-        published: publishing,
-        publishedAt: publishing ? new Date() : null,
-      }
+      include: { location: true, service: true, category: true }
     });
+
+    let count = 0;
+    for (const row of rows) {
+      const slug = buildSlug(row.location.city, row.category?.name || '', row.service.name);
+      try {
+        await prisma.masterData.update({
+          where: { id: row.id },
+          data: { published: true, publishedAt: new Date(), slug }
+        });
+      } catch (e: any) {
+        if (e.code === 'P2002') {
+          // Slug collision (e.g. two same-named cities in different
+          // provinces) - disambiguate with the row id rather than failing
+          // the whole import.
+          await prisma.masterData.update({
+            where: { id: row.id },
+            data: { published: true, publishedAt: new Date(), slug: `${slug}-${row.id}` }
+          });
+        } else {
+          throw e;
+        }
+      }
+      count++;
+    }
 
     return NextResponse.json({ success: true, count });
   } catch (error) {

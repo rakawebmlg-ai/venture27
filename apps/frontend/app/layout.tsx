@@ -1,7 +1,6 @@
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "./components/Sidebar";
-import TopHeader from "./components/TopHeader";
+import AppShell from "./components/AppShell";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -24,15 +23,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>
-        <div className="dashboard-layout">
-          <Sidebar />
-          <main className="main-content">
-            <TopHeader />
-            <div className="page-content">
-              {children}
-            </div>
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
