@@ -13,7 +13,8 @@ export default function GenerateContentPage() {
   const [enableSmtp, setEnableSmtp] = useState(true);
   const [promptContent, setPromptContent] = useState('');
   const [limit, setLimit] = useState('');
-  
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
+
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -41,8 +42,28 @@ export default function GenerateContentPage() {
     }
   };
 
-  const pendingData = data.filter(d => d.status === 'pending');
+  const categoryOptions = Object.values(
+    data.reduce((acc, item) => {
+      const id = item.categoryId;
+      const name = item.category?.name || 'Uncategorized';
+      if (!acc[id]) acc[id] = { id, name, pending: 0, total: 0 };
+      acc[id].total++;
+      if (item.status === 'pending') acc[id].pending++;
+      return acc;
+    }, {} as Record<number, { id: number; name: string; pending: number; total: number }>)
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Default to the first category with pending work once data loads; never
+  // override a selection the user already made (even if it later hits 0 pending).
+  useEffect(() => {
+    if (selectedCategoryId !== '') return;
+    const withPending = categoryOptions.find(c => c.pending > 0);
+    if (withPending) setSelectedCategoryId(withPending.id);
+  }, [data]);
+
+  const pendingData = data.filter(d => d.status === 'pending' && d.categoryId === selectedCategoryId);
   const completedData = data.filter(d => d.status === 'generated');
+  const categoryCompletedData = completedData.filter(d => d.categoryId === selectedCategoryId);
 
   const groupedData = data.reduce((acc, item) => {
     const cName = item.category?.name || 'Uncategorized';
@@ -68,15 +89,15 @@ export default function GenerateContentPage() {
   };
 
   const startGeneration = async () => {
-    if (pendingData.length === 0) return alert('No pending data to generate');
+    if (selectedCategoryId === '') return alert('Please select a category to generate');
+    if (pendingData.length === 0) return alert('No pending data to generate in this category');
 
     const parsedLimit = limit.trim() ? parseInt(limit, 10) : undefined;
     if (limit.trim() && (!parsedLimit || parsedLimit <= 0)) {
       return alert('Limit must be a positive number');
     }
 
-    // Pick the category of the first pending item for simplicity
-    const categoryId = pendingData[0].categoryId;
+    const categoryId = selectedCategoryId;
 
     setIsGenerating(true);
     setIsPaused(false);
@@ -208,7 +229,29 @@ export default function GenerateContentPage() {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '20px' }}>
+            <div className="form-group" style={{ marginTop: '20px' }}>
+              <label className="form-label">Category</label>
+              <select
+                className="form-input"
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value ? Number(e.target.value) : '')}
+                disabled={isGenerating && !isPaused}
+              >
+                <option value="">Select a category...</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.id} value={c.id} disabled={c.pending === 0}>
+                    {c.name} ({c.pending} pending / {c.total} total)
+                  </option>
+                ))}
+              </select>
+              {categoryOptions.length === 0 && (
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                  No master data yet. Generate master data first on the Master Data page.
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
               <div className="form-group">
                 <label className="form-label">Select AI Model</label>
                 <select 
@@ -279,7 +322,7 @@ export default function GenerateContentPage() {
                   disabled={!promptUploaded || pendingData.length === 0}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  {completedData.length > 0 && pendingData.length > 0
+                  {categoryCompletedData.length > 0 && pendingData.length > 0
                     ? `Continue Generation (${pendingData.length} remaining)`
                     : 'Start Generation'}
                 </button>
