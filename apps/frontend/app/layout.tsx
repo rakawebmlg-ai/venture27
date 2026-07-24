@@ -14,7 +14,13 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500"],
 });
 
+// Lets relative URLs in generateMetadata (canonical, openGraph.url, ...) on
+// the public programmatic pages resolve to a real absolute URL. Set SITE_URL
+// in the environment when deploying somewhere other than localhost.
+const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+
 export const metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Venture 27 — Dashboard",
   description: "Programmatic Pages Generation & Data Management Dashboard",
 };

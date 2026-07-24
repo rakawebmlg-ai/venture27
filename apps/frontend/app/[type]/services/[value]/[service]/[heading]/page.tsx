@@ -23,10 +23,29 @@ export async function generateMetadata({ params }) {
 
   const metaTitle = renderPlaceholders(item.service.metaTitle, item.location) || item.service.name;
   const metaDescription = renderPlaceholders(item.service.metaDescription, item.location) || undefined;
+  const canonicalPath = item.slug as string;
 
   return {
     title: metaTitle,
     description: metaDescription,
+    alternates: {
+      canonical: canonicalPath,
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+    openGraph: {
+      title: metaTitle,
+      description: metaDescription,
+      url: canonicalPath,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: metaTitle,
+      description: metaDescription,
+    },
   };
 }
 
@@ -39,9 +58,31 @@ export default async function ProgrammaticPage({ params }) {
   const locationLabel = combineLocationName(cityName, community, county);
   const renderedHeading = renderPlaceholders(item.service.heading, item.location) || item.service.name;
   const subheading = renderPlaceholders(item.service.subheading, item.location);
+  const metaDescription = renderPlaceholders(item.service.metaDescription, item.location);
+
+  // Service structured data (schema.org) - only fields we actually have real
+  // values for; no invented ratings/address/phone, matching the same rule
+  // the content-generation prompt itself follows.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: item.service?.name,
+    ...(metaDescription ? { description: metaDescription } : {}),
+    areaServed: {
+      '@type': 'Place',
+      name: `${locationLabel}, ${province}`,
+    },
+    ...(item.category?.name ? { category: item.category.name } : {}),
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0e14', color: '#e5e7eb' }}>
+      {/* eslint-disable-next-line react/no-danger */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <header style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px' }}>
         <div style={{ maxWidth: '760px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'linear-gradient(135deg,#3b82f6,#22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#0a0e14' }}>V27</div>
@@ -50,12 +91,13 @@ export default async function ProgrammaticPage({ params }) {
       </header>
 
       <main style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px 80px' }}>
-        <div style={{ fontSize: '13px', color: '#3b82f6', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '12px', textTransform: 'uppercase' }}>
+        <nav aria-label="Breadcrumb" style={{ fontSize: '13px', color: '#3b82f6', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '12px', textTransform: 'uppercase' }}>
           {locationLabel}, {province}
-        </div>
+        </nav>
 
         {/* If the generated content already includes its own <h1> (most
-            prompts are instructed to), skip rendering a second one here. */}
+            prompts are instructed to), skip rendering a second one here -
+            a page should only ever have one <h1>. */}
         {!/<h1[\s>]/i.test(item.content || '') && (
           <>
             <h1 style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1.25, margin: '0 0 12px', color: '#f9fafb' }}>{renderedHeading}</h1>
@@ -84,6 +126,7 @@ export default async function ProgrammaticPage({ params }) {
         .programmatic-content ul { margin: 0 0 18px; padding-left: 22px; }
         .programmatic-content li { margin-bottom: 8px; }
         .programmatic-content strong { color: #f3f4f6; }
+        .programmatic-content a { color: #3b82f6; }
       ` }} />
     </div>
   );
