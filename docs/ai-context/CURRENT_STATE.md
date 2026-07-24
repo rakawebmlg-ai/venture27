@@ -50,6 +50,7 @@ Active Development / Polishing
 - `apps/backend/src/index.ts` (`MODEL_IDS` map translates the UI's short `aiModel` value to the real provider model ID for all three providers; Gemini options updated to `-latest` aliases).
 - `apps/frontend/app/generate-content/page.tsx` (AI Model dropdown: "Gemini 1.5 Pro" replaced with "Gemini Flash" + "Gemini Pro", both `-latest`; Preview Content wired up; error messages surfaced; prompt textarea always editable; per-row/per-category Reset buttons).
 - `apps/frontend/app/api/master-data/route.ts` (new `PATCH` action `'reset'`).
+- New `PromptTemplate` model (`packages/database/prisma/schema.prisma`) + `apps/frontend/app/api/prompts/route.ts` (GET/POST upsert-by-name/DELETE); `/generate-content` gained a Saved Prompts dropdown + Save/Delete.
 - `packages/database/prisma/schema.prisma` (added `MasterData.published` / `publishedAt`).
 - New: `apps/frontend/app/import/page.tsx`, `apps/frontend/app/services/page.tsx`, `apps/frontend/app/api/publish/route.ts`, `apps/frontend/app/lib/placeholders.ts`, `apps/frontend/app/lib/slug.ts`.
 - `apps/frontend/app/components/Sidebar.tsx` (added "Import" and "Service" nav items under Post-Generation; the earlier single "Publish Content" entry no longer exists).
@@ -67,6 +68,8 @@ Active Development / Polishing
 - Error rows used to just say "Error" with no reason - `MasterData.errorMessage` now stores the caught error (cleared on a successful retry) and the UI surfaces it via a badge tooltip + the preview modal ("View Error").
 - There was no way to regenerate a row short of editing the DB directly (which is what earlier fixes in this session did manually). `PATCH /api/master-data` (action 'reset') plus per-row/"Reset Errors"/"Reset Category" buttons on `/generate-content` now do this from the UI.
 - The prompt.md input only accepted a file upload and then hid the content - replaced with an always-visible, always-editable textarea (file upload still works, just populates it).
+- Content Preview List's columns/headers now match the Master Data table exactly (City/Community, Province, Service Name, Meta Title, Heading, Content, Image) instead of a condensed "Service & Location" + "Content Status"/"Image Status".
+- Prompts weren't saved anywhere - every session meant re-uploading or retyping. New `PromptTemplate` model + `/api/prompts` (upsert-by-name) let you save a prompt under a name and reload it later via a dropdown on `/generate-content`; uploading a .md/.txt file auto-saves it under its filename.
 
 ## Known Problems
 - The `generate-content` UI polls for job progress. WebSockets could be more efficient in the future.
