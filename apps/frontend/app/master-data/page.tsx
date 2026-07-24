@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { combineLocationName } from '../lib/location';
 
 export default function MasterDataPage() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -43,7 +44,7 @@ export default function MasterDataPage() {
   };
 
   const filteredData = data.filter((item) =>
-    item.location?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.community?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.county?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.service?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -107,7 +108,7 @@ export default function MasterDataPage() {
 
         if (result.count === 0) {
           const reasons = [];
-          if (result.skippedLocationRows > 0) reasons.push(`${result.skippedLocationRows} location row(s) missing City/Province`);
+          if (result.skippedLocationRows > 0) reasons.push(`${result.skippedLocationRows} location row(s) missing Province, or missing all of City/Community/County`);
           if (result.skippedServiceRows > 0) reasons.push(`${result.skippedServiceRows} service row(s) missing Service Name`);
           if (result.skippedExistingCombos > 0) reasons.push(`${result.skippedExistingCombos} combination(s) already existed`);
           alert(
@@ -130,7 +131,7 @@ export default function MasterDataPage() {
   };
 
   const deleteItem = async (item: any) => {
-    if (!confirm(`Delete "${item.service?.name}" - ${item.location?.city} from master data? This cannot be undone.`)) return;
+    if (!confirm(`Delete "${item.service?.name}" - ${combineLocationName(item.location?.city, item.location?.community, item.location?.county)} from master data? This cannot be undone.`)) return;
     setDeletingId(item.id);
     try {
       const res = await fetch(`/api/master-data?id=${item.id}`, { method: 'DELETE' });
@@ -306,7 +307,7 @@ export default function MasterDataPage() {
                     {isExpanded && items.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
-                        <td>{item.location?.city}</td>
+                        <td>{item.location?.city || '-'}</td>
                         <td>{item.location?.community || '-'}</td>
                         <td>{item.location?.county || '-'}</td>
                         <td>{item.location?.province}</td>
@@ -395,7 +396,7 @@ export default function MasterDataPage() {
                 {/* Location Upload */}
                 <div>
                   <label className="form-label">1. Locations (CSV)</label>
-                  <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Req: City, Province. Optional: Community, County</p>
+                  <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Req: Province + at least one of City/Community/County</p>
                   
                   {locUploaded ? (
                     <div style={{ padding: '16px', background: 'var(--color-success-bg)', border: '1px solid var(--color-success)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>

@@ -3,11 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { buildSlug } from '../lib/slug';
+import { primaryLocationName, combineLocationName } from '../lib/location';
 
 // Rows published before the slug column existed (or that hit a naming
 // collision) may not have one yet - fall back to computing it on the fly
 // so the link/preview still works instead of showing nothing.
-const slugFor = (item: any) => item.slug || buildSlug(item.location?.city || '', item.category?.name || '', item.service?.name || '');
+const slugFor = (item: any) => item.slug || buildSlug(
+  primaryLocationName(item.location?.city, item.location?.community, item.location?.county),
+  item.category?.name || '',
+  item.service?.name || ''
+);
 
 export default function ServicesPage() {
   const [data, setData] = useState<any[]>([]);
@@ -50,7 +55,7 @@ export default function ServicesPage() {
   const scopedData = selectedService ? data.filter((d) => (d.service?.name || 'Unnamed') === selectedService) : data;
 
   const filteredData = scopedData.filter((item) =>
-    item.location?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.community?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.county?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.province.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -69,7 +74,7 @@ export default function ServicesPage() {
   };
 
   const unpublishOne = async (item: any) => {
-    if (!confirm(`Unpublish "${item.service?.name}" - ${item.location?.city}? It will move back to Import.`)) return;
+    if (!confirm(`Unpublish "${item.service?.name}" - ${combineLocationName(item.location?.city, item.location?.community, item.location?.county)}? It will move back to Import.`)) return;
     setUnpublishingId(item.id);
     try {
       const res = await fetch('/api/publish', {
@@ -213,7 +218,7 @@ export default function ServicesPage() {
                     {isExpanded && items.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
-                        <td>{item.location?.city}</td>
+                        <td>{item.location?.city || '-'}</td>
                         <td>{item.location?.community || '-'}</td>
                         <td>{item.location?.county || '-'}</td>
                         <td>{item.location?.province}</td>
@@ -274,7 +279,7 @@ export default function ServicesPage() {
         <div className="modal-overlay" onClick={() => setPreviewItem(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
             <div className="modal-header">
-              <span className="modal-title">{previewItem.service?.name} - {previewItem.location?.city}, {previewItem.location?.province}</span>
+              <span className="modal-title">{previewItem.service?.name} - {combineLocationName(previewItem.location?.city, previewItem.location?.community, previewItem.location?.county)}, {previewItem.location?.province}</span>
               <button className="modal-close" onClick={() => setPreviewItem(null)}>×</button>
             </div>
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>

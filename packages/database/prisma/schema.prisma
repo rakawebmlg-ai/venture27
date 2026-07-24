@@ -31,7 +31,7 @@ model Category {
 
 model Location {
   id        Int          @id @default(autoincrement())
-  city      String
+  city      String?
   community String?
   county    String?
   province  String

@@ -38,6 +38,13 @@ function renderMetaField(text: string | null | undefined, city: string, province
   return text.replace(/\{\{\s*city\s*\}\}/gi, city).replace(/\{\{\s*province\s*\}\}/gi, province);
 }
 
+// City/Community/County are all optional now - pick whichever is actually
+// set (most specific first) as the "place" name for prompt text and
+// filenames, instead of assuming city is always present.
+function primaryLocationName(city?: string | null, community?: string | null, county?: string | null): string {
+  return community || city || county || 'location';
+}
+
 const MODEL_IDS: Record<string, string> = {
   'gpt-4o': 'gpt-4o',
   'claude-3-5-sonnet': 'claude-3-5-sonnet-20240620',
@@ -148,7 +155,8 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
       }
 
       try {
-        console.log(`Processing MasterData ID ${item.id} - ${item.location.city} - ${item.service.name}`);
+        const place = primaryLocationName(item.location.city, item.location.community, item.location.county);
+        console.log(`Processing MasterData ID ${item.id} - ${place} - ${item.service.name}`);
 
         // Inject variables into prompt. Supports both the short snake_case
         // names shown in the UI hint ({{city}}, {{service_name}}, ...) and
@@ -156,8 +164,10 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
         // ({{City/Community}}, {{Service Name}}, {{Meta Title}}, ...) -
         // a prompt using a variable that isn't in this list passes through
         // unreplaced, which the AI model then sees as literal "{{...}}" text
-        // and tends to echo back or get confused by.
-        const city = item.location.city;
+        // and tends to echo back or get confused by. City/Community/County
+        // are each individually optional, so {{city}} etc. can render blank
+        // for a row that only has, say, a County set.
+        const city = item.location.city || '';
         const province = item.location.province;
         const community = item.location.community || '';
         const county = item.location.county || '';
@@ -201,7 +211,7 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
             content: text,
             status: 'generated',
             errorMessage: null,
-            image: `${item.location.city.toLowerCase()}-${item.service.name.toLowerCase().replace(/\s+/g, '-')}.jpg`
+            image: `${place.toLowerCase().replace(/\s+/g, '-')}-${item.service.name.toLowerCase().replace(/\s+/g, '-')}.jpg`
           }
         });
       } catch (err: any) {

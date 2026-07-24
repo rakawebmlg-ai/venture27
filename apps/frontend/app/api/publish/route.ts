@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@venture27/database';
 import { renderPlaceholders } from '../../lib/placeholders';
 import { buildSlug } from '../../lib/slug';
+import { primaryLocationName } from '../../lib/location';
 
 export async function GET(req: Request) {
   try {
@@ -79,7 +80,8 @@ export async function POST(req: Request) {
 
     let count = 0;
     for (const row of rows) {
-      const slug = buildSlug(row.location.city, row.category?.name || '', row.service.name);
+      const place = primaryLocationName(row.location.city, row.location.community, row.location.county);
+      const slug = buildSlug(place, row.category?.name || '', row.service.name);
       try {
         await prisma.masterData.update({
           where: { id: row.id },

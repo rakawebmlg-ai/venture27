@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { combineLocationName } from '../lib/location';
 
 export default function GenerateContentPage() {
   const [jobId, setJobId] = useState<number | null>(null);
@@ -79,7 +80,7 @@ export default function GenerateContentPage() {
   };
 
   const resetItem = async (item: any) => {
-    if (!confirm(`Reset "${item.service?.name}" - ${item.location?.city} back to pending? This clears its current content.`)) return;
+    if (!confirm(`Reset "${item.service?.name}" - ${combineLocationName(item.location?.city, item.location?.community, item.location?.county)} back to pending? This clears its current content.`)) return;
     setResettingId(item.id);
     await resetRows({ ids: [item.id] });
     setResettingId(null);
@@ -638,7 +639,7 @@ export default function GenerateContentPage() {
                     {isExpanded && items.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
                         <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
-                        <td>{item.location?.city}</td>
+                        <td>{item.location?.city || '-'}</td>
                         <td>{item.location?.community || '-'}</td>
                         <td>{item.location?.county || '-'}</td>
                         <td>{item.location?.province}</td>
@@ -711,7 +712,7 @@ export default function GenerateContentPage() {
         <div className="modal-overlay" onClick={() => setPreviewItem(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
             <div className="modal-header">
-              <span className="modal-title">{previewItem.service?.name} - {previewItem.location?.city}, {previewItem.location?.province}</span>
+              <span className="modal-title">{previewItem.service?.name} - {combineLocationName(previewItem.location?.city, previewItem.location?.community, previewItem.location?.county)}, {previewItem.location?.province}</span>
               <button className="modal-close" onClick={() => setPreviewItem(null)}>×</button>
             </div>
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>

@@ -1,7 +1,11 @@
 import { prisma } from '@venture27/database';
 import { notFound } from 'next/navigation';
 import { renderPlaceholders } from '../../../../lib/placeholders';
+import { combineLocationName } from '../../../../lib/location';
 
+// The [city] segment is really "whichever of City/Community/County was
+// primary at import time" (see lib/location.ts#primaryLocationName) - it's
+// just the folder/param name, not a guarantee the value is actually a city.
 async function getPage(city: string, category: string, service: string) {
   const slug = `/${city}/services/${category}/${service}`;
   return prisma.masterData.findFirst({
@@ -30,7 +34,7 @@ export default async function ProgrammaticPage({ params }) {
   if (!item) notFound();
 
   const { city: cityName, community, county, province } = item.location;
-  const locationLabel = [cityName, community, county].filter(Boolean).join(', ');
+  const locationLabel = combineLocationName(cityName, community, county);
   const heading = renderPlaceholders(item.service.heading, item.location) || item.service.name;
   const subheading = renderPlaceholders(item.service.subheading, item.location);
 

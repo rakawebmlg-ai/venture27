@@ -64,14 +64,16 @@ export async function POST(req: Request) {
 
     // Combine logic
     for (const loc of parsedLocations) {
-      const city = loc.City || loc.city;
+      // City, Community, and County are all individually optional now - a
+      // location just needs a Province plus at least one of the three, since
+      // generation combines whichever of them are actually set (a county-only
+      // row is valid, as is a community-only or city-only one).
+      const city = loc.City || loc.city || null;
       const province = loc.Province || loc.province;
-      // Community/County are optional - a location can be just a City, or a
-      // City plus one or both of these more specific sub-areas.
       const community = loc.Community || loc.community || null;
       const county = loc.County || loc.county || null;
 
-      if (!city || !province) {
+      if (!province || (!city && !community && !county)) {
         skippedLocationRows++;
         continue;
       }
