@@ -24,6 +24,17 @@ Final request this session: group `/services` by City/Community/County as well a
 
 Then the user asked why Overview showed "20 locations, 13 core services" when their data was empty. Confirmed via direct query: 0 of those 20 `Location` rows and 0 of the 13 `Service` rows are referenced by any `MasterData` row - they're orphaned templates left over from whatever emptied `MasterData` (see below). Fixed `/api/overview` to count only rows with `data: { some: {} }` (at least one Master Data combination using them), so the stat reflects reality. Verified live: showed 0/0/0/0, created one throwaway combo (counts went to 1/1/1/0), deleted it (back to 0). Note for later: Location/Service rows are deliberately never deleted by Delete Category or Reset - they're meant to be reused - so any other place that does a naive `.count()` on those tables should probably use the same `some: {}` filter if it's meant to represent "currently in use."
 
+Immediately after, the user clarified the Service grouping should be a real navigation split, not in-page tabs: three separate sidebar sub-menu items (City/Community/County), and the public slug format changed to `/{type}/services/{value}/{service-name}/{heading}` (asked via AskUserQuestion to pin down both the nav structure and the exact slug shape before implementing, since a slug format change breaks existing links). Implemented:
+- `lib/location.ts#primaryLocationType` - which field (city/community/county) is primary for a row + its value, same priority as `primaryLocationName` (Community > City > County).
+- `lib/slug.ts#buildSlug` signature changed to `(type, value, serviceName, heading)`.
+- `api/publish/route.ts`'s import action now renders Heading (via `renderPlaceholders`) and falls back to service name if blank.
+- Deleted `app/[city]/services/[category]/[service]/page.tsx`, added `app/[type]/services/[value]/[service]/[heading]/page.tsx`.
+- `AppShell`'s chrome-hiding regex updated for the new 5-segment shape.
+- `Sidebar`: "Service" is now a parent with 3 sub-links.
+- New `app/components/ServiceListPage.tsx` (shared, parameterized by `field`) + three thin pages (`services/city`, `services/community`, `services/county`); `/services` redirects to `/services/city`.
+
+Found while verifying: exactly one real published row (id 542) had an old-format slug from before this change, which would have 404'd under the new routes. Fixed with a one-off script (`apps/backend/src/migrate_slugs_tmp.ts`, written, run once, then deleted - NOT part of the committed app) that recomputed every published row's slug with the new format; verified the new URL resolves (200) and the old one now correctly 404s. If more content gets published under an old format again for any reason, the same throwaway-script approach works, or write a small internal endpoint if this becomes routine.
+
 Unresolved from earlier: the "SEO" category's `MasterData` rows are all gone (0 rows; `Location`/`Service`/`Category` shells still exist, now confirmed orphaned per above). Row-count arithmetic during this session's own test cleanups was independently verified exact both times, ruling out this session's changes as the cause. Best guess: the user used "Delete Category" (a feature built earlier this session) on their own data via the live UI - not confirmed, flagged in CURRENT_STATE.md. If picking this up next: don't assume it's a bug to fix; ask the user first.
 
 Several more fixes landed after the AI-generation fix above, each reported directly by the user after trying the app:
