@@ -7,6 +7,7 @@
 Active Development / Polishing
 
 ## Current Objective
+-1. Programmatic pages are now REAL public routes, not just an internal status. `MasterData.slug` (unique) is computed and persisted at import time; `/[city]/services/[category]/[service]/page.tsx` serves the actual page (real `<title>`/meta description via `generateMetadata`, renders stored HTML content), 404s for anything not published. The admin Sidebar/TopHeader are hidden specifically for that URL shape via a new `AppShell` component wrapping `layout.tsx`. This supersedes the earlier "publish is internal-only, no public route" note below - the user explicitly asked for real pages this time.
 0. Fixed real AI generation: the Generate Content dropdown's model values ('claude-3-5-sonnet', 'gemini-1-5-pro') were never valid provider model IDs, so every generation call failed and rows silently sat at status 'error'. Also discovered mid-fix that Google had fully retired `gemini-1.5-pro` - replaced it with `-latest` alias options ("Gemini Flash" / "Gemini Pro") verified working against the user's real key.
 1. Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province}}` placeholders in Service CSV meta columns now render per-location, re-uploading a Service CSV updates its stored template instead of being silently ignored, and rows/categories can now be deleted.
 2. Added a batch "Limit" to `/generate-content` so a run can be capped to N rows and continued later; fixed two BullMQ worker bugs that were blocking that (per-batch progress, a job-completion update that referenced a non-existent field). Also added a Category picker so the user chooses which category to generate instead of it being implicit.
@@ -23,10 +24,11 @@ Active Development / Polishing
 - Master Data delete: per-row and per-category deletion, both API (`DELETE /api/master-data`) and UI.
 - Generate Content batch limit: cap a run to the next N pending rows via a new "Limit" field; Start button becomes "Continue Generation (N remaining)" for subsequent batches. Backend worker batches deterministically (`orderBy: id asc` + `take: limit`) and reports progress per-batch.
 - Generate Content category picker: dropdown showing pending/total per category, drives the same start/limit/continue flow.
-- Publish workflow, split across two menus (both use `GET/POST /api/publish`; `MasterData` gained `published`/`publishedAt` columns):
+- Publish workflow, split across two menus (both use `GET/POST /api/publish`; `MasterData` gained `published`/`publishedAt`/`slug` columns):
   - `/import` — generated-but-unpublished content, grouped by category, with per-row/per-category/all import and a content preview modal.
-  - `/services` — published content, filtered via a "Select Service" dropdown, grouped by category, with per-row unpublish, CSV export, and a preview-only "Slug" column (`app/lib/slug.ts`) showing `/{city}/services/{category}/{service-name}` - not a live route.
+  - `/services` — published content, filtered via a "Select Service" dropdown (defaults to "All Services"), grouped by category, with per-row unpublish, CSV export, and a "Slug"/"View Page" link to the real programmatic page (see below).
   - The original combined `/publish-content` page was removed in favor of this split (explicit user request).
+- Programmatic pages are real routes now: `app/[city]/services/[category]/[service]/page.tsx` looks up `MasterData` by its stored `slug` (must be `published`), 404s otherwise, sets `<title>`/meta description from the rendered Meta Title/Description, and renders the stored HTML `content`. `AppShell` (`app/components/AppShell.tsx`) hides the dashboard Sidebar/TopHeader specifically for that URL pattern; every other route keeps the normal dashboard chrome.
 - Repo pushed to GitHub: `https://github.com/rakawebmlg-ai/venture27.git` (`main`), with root `.gitignore` excluding `node_modules/`, `.env*`, `.next/`.
 
 ## In Progress
@@ -51,6 +53,7 @@ Active Development / Polishing
 - `apps/frontend/app/generate-content/page.tsx` (AI Model dropdown: "Gemini 1.5 Pro" replaced with "Gemini Flash" + "Gemini Pro", both `-latest`; Preview Content wired up; error messages surfaced; prompt textarea always editable; per-row/per-category Reset buttons).
 - `apps/frontend/app/api/master-data/route.ts` (new `PATCH` action `'reset'`).
 - New `PromptTemplate` model (`packages/database/prisma/schema.prisma`) + `apps/frontend/app/api/prompts/route.ts` (GET/POST upsert-by-name/DELETE); `/generate-content` gained a Saved Prompts dropdown + Save/Delete.
+- `MasterData.slug` (unique) + `app/[city]/services/[category]/[service]/page.tsx` (new public page route) + `app/components/AppShell.tsx` (new) + `apps/frontend/app/layout.tsx` (now just wraps `<AppShell>`) + `apps/frontend/app/lib/slug.ts` (`buildSlugPreview` renamed to `buildSlug`) + `apps/frontend/app/api/publish/route.ts` (import now computes/persists a slug per row instead of a single `updateMany`).
 - `packages/database/prisma/schema.prisma` (added `MasterData.published` / `publishedAt`).
 - New: `apps/frontend/app/import/page.tsx`, `apps/frontend/app/services/page.tsx`, `apps/frontend/app/api/publish/route.ts`, `apps/frontend/app/lib/placeholders.ts`, `apps/frontend/app/lib/slug.ts`.
 - `apps/frontend/app/components/Sidebar.tsx` (added "Import" and "Service" nav items under Post-Generation; the earlier single "Publish Content" entry no longer exists).
