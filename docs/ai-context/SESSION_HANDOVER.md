@@ -15,6 +15,10 @@
 ## Current Task
 Done for this session. Awaiting user's next command (deploy/push, or continue with Pending items below).
 
+Two more fixes landed after the AI-generation fix above, both reported directly by the user after trying the app:
+- "Preview Content" button on `/generate-content` was a dead `<button disabled={!item.content}>` with no `onClick` - wired it to the same preview modal pattern used on `/import`/`/services`.
+- User then tried generating with "Gemini Pro" and got errors with zero explanation (just an "Error" badge). Turned out `gemini-pro-latest` has 0 free-tier quota on their key (confirmed via a real API call) while `gemini-flash-latest` works. Added `MasterData.errorMessage` (schema change, `prisma db push`'d) so the worker's catch block records *why* it failed, surfaced via a badge tooltip and the preview modal (relabeled "View Error" for failed rows). Verified by deliberately reproducing the quota error, then successfully regenerating the same rows with Gemini Flash.
+
 ## What Has Been Completed
 - Monorepo Migration.
 - Redis + BullMQ integration.

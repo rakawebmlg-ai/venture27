@@ -61,13 +61,17 @@ Active Development / Polishing
 ## Current Errors
 - None known.
 
+## Known Problems (fixed this session, kept for context)
+- Content Preview List's "Preview Content" button used to be a dead stub with no `onClick` - now opens a modal (meta title/description/content).
+- Error rows used to just say "Error" with no reason - `MasterData.errorMessage` now stores the caught error (cleared on a successful retry) and the UI surfaces it via a badge tooltip + the preview modal ("View Error").
+
 ## Known Problems
 - The `generate-content` UI polls for job progress. WebSockets could be more efficient in the future.
 - `npx prisma db push` / `prisma generate` in `packages/database` fails with `EPERM` on the query engine `.dll` while dev servers are running (Windows file lock). Stop `npm run dev` first if you need to regenerate the Prisma client after a schema change.
 - `apps/backend`'s `npm run dev` (`tsx src/index.ts`, no watch mode) does not hot-reload on save - must be manually restarted after editing `apps/backend/src/index.ts`.
 - Pause/Resume on `/generate-content` is still broken (`resume` never re-enqueues a BullMQ job - see SESSION_HANDOVER.md). The new Limit/Continue flow avoids relying on it.
 - `apps/backend/src/index.ts` line ~4 has a pre-existing (not caused by recent work) TS error: `import { prisma, MasterData } from '@venture27/database'` - `MasterData` has no exported member. Harmless at runtime (`tsx` doesn't type-check), but worth cleaning up (unused import).
-- The `gemini-pro-latest` model hit a 429 (quota exceeded) on the free tier when tested directly against Google's API; `gemini-flash-latest` did not. If a user picks "Gemini Pro" and hits persistent errors, it may just be free-tier quota, not a bug.
+- The `gemini-pro-latest` model has `limit: 0` free-tier quota on the user's key (confirmed via the real API - `generativelanguage.googleapis.com` quota metric for `model: gemini-3.1-pro` is 0); `gemini-flash-latest` works fine and is what the free tier actually supports. If a user picks "Gemini Pro" and every row errors, that's expected on a free-tier key, not a bug - the error message (now shown in the UI) will say "quota exceeded" when this is the cause.
 
 ## Next Recommended Action
 - Implement the actual SMTP email sending logic in the BullMQ worker when a job reaches 100%.
