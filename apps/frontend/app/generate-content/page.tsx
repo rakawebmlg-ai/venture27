@@ -18,6 +18,7 @@ export default function GenerateContentPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [previewItem, setPreviewItem] = useState<any | null>(null);
 
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
@@ -455,7 +456,7 @@ export default function GenerateContentPage() {
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-ghost btn-sm" disabled={!item.content}>Preview Content</button>
+                          <button className="btn btn-ghost btn-sm" disabled={!item.content} onClick={() => setPreviewItem(item)}>Preview Content</button>
                         </td>
                       </tr>
                     ))}
@@ -486,6 +487,34 @@ export default function GenerateContentPage() {
         .spin { animation: spin 1s linear infinite; }
         .group-header-row:hover { background: rgba(255,255,255,0.02) !important; }
       `}} />
+
+      {previewItem && (
+        <div className="modal-overlay" onClick={() => setPreviewItem(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
+            <div className="modal-header">
+              <span className="modal-title">{previewItem.service?.name} - {previewItem.location?.city}, {previewItem.location?.province}</span>
+              <button className="modal-close" onClick={() => setPreviewItem(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Meta Title</div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{previewItem.service?.metaTitle || '-'}</div>
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Meta Description</div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{previewItem.service?.metaDescription || '-'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Content</div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewItem.content || 'No content.'}</div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setPreviewItem(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
