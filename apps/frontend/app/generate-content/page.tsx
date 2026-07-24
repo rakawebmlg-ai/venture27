@@ -7,7 +7,6 @@ export default function GenerateContentPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [promptUploaded, setPromptUploaded] = useState(false);
   const [dragOverPrompt, setDragOverPrompt] = useState(false);
   const [aiModel, setAiModel] = useState('gpt-4o');
   const [enableSmtp, setEnableSmtp] = useState(true);
@@ -84,7 +83,6 @@ export default function GenerateContentPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       setPromptContent(e.target?.result as string);
-      setPromptUploaded(true);
     };
     reader.readAsText(file);
   };
@@ -208,26 +206,29 @@ export default function GenerateContentPage() {
           </div>
           <div className="card-body">
             <div className="form-group">
-              <label className="form-label">Upload Template (prompt.md)</label>
-              {promptUploaded ? (
-                <div style={{ padding: '16px', background: 'var(--color-success-bg)', border: '1px solid var(--color-success)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                  ✅ prompt.md loaded successfully
-                </div>
-              ) : (
-                <label
-                  className={`upload-area ${dragOverPrompt ? 'dragover' : ''}`}
-                  style={{ padding: '20px', minHeight: 'auto', borderWidth: '1px', cursor: 'pointer', display: 'block' }}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverPrompt(true); }}
-                  onDragLeave={() => setDragOverPrompt(false)}
-                  onDrop={(e) => { e.preventDefault(); setDragOverPrompt(false); if(e.dataTransfer.files[0]) handlePromptFile(e.dataTransfer.files[0]); }}
-                >
-                  <input type="file" accept=".md,.txt" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) handlePromptFile(e.target.files[0]); }} />
-                  <div className="upload-area-icon" style={{ fontSize: '24px', marginBottom: '8px' }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                  </div>
-                  <div className="upload-area-text" style={{ fontSize: '13px' }}>Drop prompt.md here or click to browse</div>
-                </label>
-              )}
+              <label className="form-label">Prompt Template</label>
+              <label
+                className={`upload-area ${dragOverPrompt ? 'dragover' : ''}`}
+                style={{ padding: '10px', minHeight: 'auto', borderWidth: '1px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverPrompt(true); }}
+                onDragLeave={() => setDragOverPrompt(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOverPrompt(false); if(e.dataTransfer.files[0]) handlePromptFile(e.dataTransfer.files[0]); }}
+              >
+                <input type="file" accept=".md,.txt" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) handlePromptFile(e.target.files[0]); }} />
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <span className="upload-area-text" style={{ fontSize: '12px' }}>{promptContent.trim() ? 'Drop another file to replace the prompt below' : 'Drop prompt.md here or click to upload (optional)'}</span>
+              </label>
+              <textarea
+                className="form-input"
+                style={{ minHeight: '160px', fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: 1.6, resize: 'vertical' }}
+                placeholder={'Write your prompt template here, or upload one above. Example:\nWrite a 300-word SEO article about {{service_name}} for {{city}}, {{province}}.'}
+                value={promptContent}
+                onChange={(e) => setPromptContent(e.target.value)}
+                disabled={isGenerating && !isPaused}
+              />
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                Available variables: <code>{'{{city}}'}</code> <code>{'{{province}}'}</code> <code>{'{{service_name}}'}</code> <code>{'{{category}}'}</code>
+              </div>
             </div>
 
             <div className="form-group" style={{ marginTop: '20px' }}>
@@ -321,7 +322,7 @@ export default function GenerateContentPage() {
                   className="btn btn-primary btn-lg"
                   style={{ flex: 1, justifyContent: 'center' }}
                   onClick={startGeneration}
-                  disabled={!promptUploaded || pendingData.length === 0}
+                  disabled={!promptContent.trim() || pendingData.length === 0}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                   {categoryCompletedData.length > 0 && pendingData.length > 0
