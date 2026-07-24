@@ -48,7 +48,8 @@ Active Development / Polishing
 - `apps/frontend/app/api/generate/route.ts` ('start' now accepts/forwards `limit`).
 - `apps/backend/src/index.ts` (batched, deterministic pending-item fetch; per-batch progress; fixed job-completion update).
 - `apps/backend/src/index.ts` (`MODEL_IDS` map translates the UI's short `aiModel` value to the real provider model ID for all three providers; Gemini options updated to `-latest` aliases).
-- `apps/frontend/app/generate-content/page.tsx` (AI Model dropdown: "Gemini 1.5 Pro" replaced with "Gemini Flash" + "Gemini Pro", both `-latest`).
+- `apps/frontend/app/generate-content/page.tsx` (AI Model dropdown: "Gemini 1.5 Pro" replaced with "Gemini Flash" + "Gemini Pro", both `-latest`; Preview Content wired up; error messages surfaced; prompt textarea always editable; per-row/per-category Reset buttons).
+- `apps/frontend/app/api/master-data/route.ts` (new `PATCH` action `'reset'`).
 - `packages/database/prisma/schema.prisma` (added `MasterData.published` / `publishedAt`).
 - New: `apps/frontend/app/import/page.tsx`, `apps/frontend/app/services/page.tsx`, `apps/frontend/app/api/publish/route.ts`, `apps/frontend/app/lib/placeholders.ts`, `apps/frontend/app/lib/slug.ts`.
 - `apps/frontend/app/components/Sidebar.tsx` (added "Import" and "Service" nav items under Post-Generation; the earlier single "Publish Content" entry no longer exists).
@@ -64,6 +65,8 @@ Active Development / Polishing
 ## Known Problems (fixed this session, kept for context)
 - Content Preview List's "Preview Content" button used to be a dead stub with no `onClick` - now opens a modal (meta title/description/content).
 - Error rows used to just say "Error" with no reason - `MasterData.errorMessage` now stores the caught error (cleared on a successful retry) and the UI surfaces it via a badge tooltip + the preview modal ("View Error").
+- There was no way to regenerate a row short of editing the DB directly (which is what earlier fixes in this session did manually). `PATCH /api/master-data` (action 'reset') plus per-row/"Reset Errors"/"Reset Category" buttons on `/generate-content` now do this from the UI.
+- The prompt.md input only accepted a file upload and then hid the content - replaced with an always-visible, always-editable textarea (file upload still works, just populates it).
 
 ## Known Problems
 - The `generate-content` UI polls for job progress. WebSockets could be more efficient in the future.
