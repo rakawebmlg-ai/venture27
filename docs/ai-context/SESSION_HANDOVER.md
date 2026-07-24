@@ -4,6 +4,7 @@
 2026-07-24
 
 ## Current Objective
+0. Fixed AI generation actually working: `apps/backend/src/index.ts` passed the Generate Content dropdown's short `aiModel` value ('claude-3-5-sonnet', 'gemini-1-5-pro') straight to each provider SDK as the model ID, but none of those are real model IDs (Anthropic needs a dated snapshot, Google needs a `models/` prefix + dots not hyphens) - every call failed and every row silently became status 'error', which is why the user saw nothing in Content Preview List. Fixed with a `MODEL_IDS` lookup map. Then discovered, testing live against the user's real Gemini key, that `gemini-1.5-pro` itself no longer exists on Google's API (404) - replaced with `gemini-flash-latest` / `gemini-pro-latest` (Flash verified working end-to-end; Pro hit a 429 free-tier quota error but is a valid model).
 1. Fixed the "Generate Master Data" flow on `/master-data` (placeholder rendering, service template refresh, delete support).
 2. Added a batch "Limit" and a Category picker to `/generate-content` so the user can choose a category, generate N rows now, and continue later without re-processing already-done rows.
 3. Added `MasterData.published`/`publishedAt` (via `prisma db push`) and a publish workflow. Originally built as one combined `/publish-content` page, then split per explicit user request into:
@@ -63,7 +64,7 @@ Done for this session. Awaiting user's next command (deploy/push, or continue wi
 - On Windows, `apps/backend`'s `tsx src/index.ts` (no `tsx watch`) does not hot-reload — had to `Stop-Process` the old node PID(s) and re-run `npm run dev --workspace=@venture27/backend` to pick up code changes. Also found and killed an orphaned backend process still holding port 3001 from an earlier session before the restart would bind.
 
 ## Current Blockers
-- None.
+- None. Note: Anthropic's fix (`claude-3-5-sonnet-20240620`) is unverified - no `anthropicKey` is configured in this environment's `Settings` row, so it's only confirmed correct by format, not by a real call like Gemini was.
 
 ## Exact Next Step
 - Wait for user instruction. Recommend implementing CSV Export or SMTP Notifications, or cleaning up the dead `apps/frontend/worker.ts` (pg-boss, wrong queue system).

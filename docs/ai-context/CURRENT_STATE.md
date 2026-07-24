@@ -7,6 +7,7 @@
 Active Development / Polishing
 
 ## Current Objective
+0. Fixed real AI generation: the Generate Content dropdown's model values ('claude-3-5-sonnet', 'gemini-1-5-pro') were never valid provider model IDs, so every generation call failed and rows silently sat at status 'error'. Also discovered mid-fix that Google had fully retired `gemini-1.5-pro` - replaced it with `-latest` alias options ("Gemini Flash" / "Gemini Pro") verified working against the user's real key.
 1. Fixed the Master Data CSV generate flow (`/master-data`): `{{City}}`/`{{Province}}` placeholders in Service CSV meta columns now render per-location, re-uploading a Service CSV updates its stored template instead of being silently ignored, and rows/categories can now be deleted.
 2. Added a batch "Limit" to `/generate-content` so a run can be capped to N rows and continued later; fixed two BullMQ worker bugs that were blocking that (per-batch progress, a job-completion update that referenced a non-existent field). Also added a Category picker so the user chooses which category to generate instead of it being implicit.
 3. Added `MasterData.published`/`publishedAt` and a publish workflow, split into two menus per the user's explicit request: `/import` (generated content not yet published, with import actions) and `/services` (published content, browsed via a "Select Service" dropdown, with a preview-only Slug column previewing the eventual `/{city}/services/{category}/{service-name}` URL structure). Both share `GET/POST /api/publish`.
@@ -46,6 +47,8 @@ Active Development / Polishing
 - `apps/frontend/app/generate-content/page.tsx` (Limit input, Continue-labeled button, Category picker).
 - `apps/frontend/app/api/generate/route.ts` ('start' now accepts/forwards `limit`).
 - `apps/backend/src/index.ts` (batched, deterministic pending-item fetch; per-batch progress; fixed job-completion update).
+- `apps/backend/src/index.ts` (`MODEL_IDS` map translates the UI's short `aiModel` value to the real provider model ID for all three providers; Gemini options updated to `-latest` aliases).
+- `apps/frontend/app/generate-content/page.tsx` (AI Model dropdown: "Gemini 1.5 Pro" replaced with "Gemini Flash" + "Gemini Pro", both `-latest`).
 - `packages/database/prisma/schema.prisma` (added `MasterData.published` / `publishedAt`).
 - New: `apps/frontend/app/import/page.tsx`, `apps/frontend/app/services/page.tsx`, `apps/frontend/app/api/publish/route.ts`, `apps/frontend/app/lib/placeholders.ts`, `apps/frontend/app/lib/slug.ts`.
 - `apps/frontend/app/components/Sidebar.tsx` (added "Import" and "Service" nav items under Post-Generation; the earlier single "Publish Content" entry no longer exists).
@@ -63,6 +66,8 @@ Active Development / Polishing
 - `npx prisma db push` / `prisma generate` in `packages/database` fails with `EPERM` on the query engine `.dll` while dev servers are running (Windows file lock). Stop `npm run dev` first if you need to regenerate the Prisma client after a schema change.
 - `apps/backend`'s `npm run dev` (`tsx src/index.ts`, no watch mode) does not hot-reload on save - must be manually restarted after editing `apps/backend/src/index.ts`.
 - Pause/Resume on `/generate-content` is still broken (`resume` never re-enqueues a BullMQ job - see SESSION_HANDOVER.md). The new Limit/Continue flow avoids relying on it.
+- `apps/backend/src/index.ts` line ~4 has a pre-existing (not caused by recent work) TS error: `import { prisma, MasterData } from '@venture27/database'` - `MasterData` has no exported member. Harmless at runtime (`tsx` doesn't type-check), but worth cleaning up (unused import).
+- The `gemini-pro-latest` model hit a 429 (quota exceeded) on the free tier when tested directly against Google's API; `gemini-flash-latest` did not. If a user picks "Gemini Pro" and hits persistent errors, it may just be free-tier quota, not a bug.
 
 ## Next Recommended Action
 - Implement the actual SMTP email sending logic in the BullMQ worker when a job reaches 100%.
