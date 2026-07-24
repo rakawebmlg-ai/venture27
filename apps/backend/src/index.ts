@@ -141,14 +141,16 @@ const worker = new Worker<GenerationJobPayload>(
           data: {
             content: text,
             status: 'generated',
+            errorMessage: null,
             image: `${item.location.city.toLowerCase()}-${item.service.name.toLowerCase().replace(/\s+/g, '-')}.jpg`
           }
         });
       } catch (err: any) {
         console.error(`Error generating for ID ${item.id}:`, err);
+        const errorMessage = String(err?.message || err).slice(0, 1000);
         await prisma.masterData.update({
           where: { id: item.id },
-          data: { status: 'error' }
+          data: { status: 'error', errorMessage }
         });
       }
 

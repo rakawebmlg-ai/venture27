@@ -443,7 +443,7 @@ export default function GenerateContentPage() {
                           {item.status === 'generated' ? (
                             <span className="badge badge-success"><span className="badge-dot"></span> Generated</span>
                           ) : item.status === 'error' ? (
-                            <span className="badge badge-danger"><span className="badge-dot"></span> Error</span>
+                            <span className="badge badge-danger" title={item.errorMessage || ''} style={{ cursor: item.errorMessage ? 'help' : 'default' }}><span className="badge-dot"></span> Error</span>
                           ) : (
                             <span className="badge badge-warning"><span className="badge-dot"></span> Pending</span>
                           )}
@@ -456,7 +456,9 @@ export default function GenerateContentPage() {
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-ghost btn-sm" disabled={!item.content} onClick={() => setPreviewItem(item)}>Preview Content</button>
+                          <button className="btn btn-ghost btn-sm" disabled={!item.content && !item.errorMessage} onClick={() => setPreviewItem(item)}>
+                            {item.status === 'error' ? 'View Error' : 'Preview Content'}
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -496,6 +498,12 @@ export default function GenerateContentPage() {
               <button className="modal-close" onClick={() => setPreviewItem(null)}>×</button>
             </div>
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {previewItem.status === 'error' && previewItem.errorMessage && (
+                <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid var(--color-error)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-error)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Generation Failed</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>{previewItem.errorMessage}</div>
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Meta Title</div>
                 <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{previewItem.service?.metaTitle || '-'}</div>
