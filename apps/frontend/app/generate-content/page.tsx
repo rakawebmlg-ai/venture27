@@ -391,8 +391,8 @@ export default function GenerateContentPage() {
                 onChange={(e) => { setPromptContent(e.target.value); setSelectedPromptId(''); }}
                 disabled={isGenerating && !isPaused}
               />
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                Available variables: <code>{'{{city}}'}</code> <code>{'{{province}}'}</code> <code>{'{{service_name}}'}</code> <code>{'{{category}}'}</code>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', lineHeight: 1.8 }}>
+                Available variables: <code>{'{{city}}'}</code> / <code>{'{{City/Community}}'}</code> <code>{'{{province}}'}</code> <code>{'{{service_name}}'}</code> / <code>{'{{Service Name}}'}</code> <code>{'{{category}}'}</code> <code>{'{{Meta Title}}'}</code> <code>{'{{Meta Description}}'}</code> <code>{'{{Heading}}'}</code> <code>{'{{Subheading}}'}</code> <code>{'{{No}}'}</code>
               </div>
             </div>
 

@@ -30,6 +30,14 @@ async function getSettings() {
 // `models/` prefix and dots, not hyphens, in the version number) - passing
 // the short value straight through makes every request fail with a
 // model-not-found error, so every row silently ends up 'error'.
+// Renders {{City}}/{{Province}} inside a Service's meta template (metaTitle,
+// heading, etc.) so the values injected into the prompt below are the actual
+// per-location text, not the raw "{{City}}" placeholder.
+function renderMetaField(text: string | null | undefined, city: string, province: string): string {
+  if (!text) return '';
+  return text.replace(/\{\{\s*city\s*\}\}/gi, city).replace(/\{\{\s*province\s*\}\}/gi, province);
+}
+
 const MODEL_IDS: Record<string, string> = {
   'gpt-4o': 'gpt-4o',
   'claude-3-5-sonnet': 'claude-3-5-sonnet-20240620',
@@ -121,18 +129,41 @@ const worker = new Worker<GenerationJobPayload>(
       try {
         console.log(`Processing MasterData ID ${item.id} - ${item.location.city} - ${item.service.name}`);
 
-        // Inject variables into prompt
+        // Inject variables into prompt. Supports both the short snake_case
+        // names shown in the UI hint ({{city}}, {{service_name}}, ...) and
+        // the longer names real-world prompt.md files tend to use
+        // ({{City/Community}}, {{Service Name}}, {{Meta Title}}, ...) -
+        // a prompt using a variable that isn't in this list passes through
+        // unreplaced, which the AI model then sees as literal "{{...}}" text
+        // and tends to echo back or get confused by.
+        const city = item.location.city;
+        const province = item.location.province;
+        const substitutions: [RegExp, string][] = [
+          [/\{\{\s*city\s*\}\}/gi, city],
+          [/\{\{\s*province\s*\}\}/gi, province],
+          [/\{\{\s*city\s*\/\s*community\s*\}\}/gi, city],
+          [/\{\{\s*service[_\s]?name\s*\}\}/gi, item.service.name],
+          [/\{\{\s*category\s*\}\}/gi, item.category?.name || ''],
+          [/\{\{\s*meta[_\s]?title\s*\}\}/gi, renderMetaField(item.service.metaTitle, city, province)],
+          [/\{\{\s*meta[_\s]?description\s*\}\}/gi, renderMetaField(item.service.metaDescription, city, province)],
+          [/\{\{\s*heading\s*\}\}/gi, renderMetaField(item.service.heading, city, province)],
+          [/\{\{\s*subheading\s*\}\}/gi, renderMetaField(item.service.subheading, city, province)],
+          [/\{\{\s*no\s*\}\}/gi, String(item.id)],
+        ];
         let finalPrompt = promptTemplate;
-        finalPrompt = finalPrompt.replace(/\{\{city\}\}/gi, item.location.city);
-        finalPrompt = finalPrompt.replace(/\{\{province\}\}/gi, item.location.province);
-        finalPrompt = finalPrompt.replace(/\{\{service_name\}\}/gi, item.service.name);
-        finalPrompt = finalPrompt.replace(/\{\{category\}\}/gi, item.category?.name || '');
+        for (const [pattern, value] of substitutions) {
+          finalPrompt = finalPrompt.replace(pattern, value);
+        }
 
-        // Call AI
+        // Call AI. Newer Gemini models spend part of this budget on internal
+        // "thinking" tokens before writing any visible text - at 1500 that
+        // regularly ate ~1200 tokens of thinking alone, so the actual article
+        // got cut off mid-sentence (finishReason: MAX_TOKENS) well short of
+        // what was asked for. 8000 leaves enough room for both.
         const { text } = await generateText({
           model: aiProvider,
           prompt: finalPrompt,
-          maxTokens: 1500,
+          maxTokens: 8000,
         });
 
         // Update Master Data
