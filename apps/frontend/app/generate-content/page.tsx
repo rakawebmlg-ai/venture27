@@ -308,6 +308,10 @@ export default function GenerateContentPage() {
             } else if (job.status === 'stopped') {
               setIsGenerating(false);
               clearInterval(progressInterval.current!);
+            } else if (job.status === 'failed') {
+              setIsGenerating(false);
+              clearInterval(progressInterval.current!);
+              alert(`Generation failed to start: ${job.errorLogs || 'Unknown error'}`);
             }
           }
         } catch (e) {
@@ -536,11 +540,16 @@ export default function GenerateContentPage() {
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{progress}%</span>
                 </div>
+                {isGenerating && !isPaused && progress === 0 && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                    Writing full-length articles can take 20-60s per row - the bar moves once the first one finishes.
+                  </div>
+                )}
                 <div className="progress-bar" style={{ height: '8px' }}>
-                  <div 
-                    className="progress-bar-fill" 
-                    style={{ 
-                      width: `${progress}%`, 
+                  <div
+                    className="progress-bar-fill"
+                    style={{
+                      width: `${progress}%`,
                       background: isPaused ? 'var(--color-warning)' : 'var(--color-success)',
                       transition: 'width 0.5s ease'
                     }}

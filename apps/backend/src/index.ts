@@ -64,29 +64,50 @@ const worker = new Worker<GenerationJobPayload>(
     const { jobId, categoryId, promptTemplate, aiModel, limit } = job.data;
     console.log(`[Job ${job.id}] Started AI Generation for Database Job ID: ${jobId}`);
 
-    const settings = await getSettings();
+    // Everything below is wrapped so a setup failure (missing API key,
+    // unsupported model, DB hiccup before the per-item loop) marks the Job
+    // row 'failed' with a reason instead of leaving it stuck at 'running'/0%
+    // forever - previously an unhandled throw here only reached BullMQ's own
+    // logging (`worker.on('failed', ...)`) and never touched our Job row, so
+    // the UI just spun indefinitely with no way to tell what happened.
+    try {
+      const settings = await getSettings();
 
-    // Setup AI provider
-    const modelId = MODEL_IDS[aiModel] || (aiModel.startsWith('gpt-') ? aiModel : undefined);
-    if (!modelId) throw new Error(`Unsupported AI model: ${aiModel}`);
+      // Setup AI provider
+      const modelId = MODEL_IDS[aiModel] || (aiModel.startsWith('gpt-') ? aiModel : undefined);
+      if (!modelId) throw new Error(`Unsupported AI model: ${aiModel}`);
 
-    let aiProvider: any;
-    if (aiModel === 'gpt-4o' || aiModel.startsWith('gpt-')) {
-      if (!settings.openaiKey) throw new Error('OpenAI API Key not configured');
-      const openai = createOpenAI({ apiKey: settings.openaiKey });
-      aiProvider = openai(modelId);
-    } else if (aiModel === 'claude-3-5-sonnet') {
-      if (!settings.anthropicKey) throw new Error('Anthropic API Key not configured');
-      const anthropic = createAnthropic({ apiKey: settings.anthropicKey });
-      aiProvider = anthropic(modelId);
-    } else if (aiModel.startsWith('gemini-')) {
-      if (!settings.geminiKey) throw new Error('Gemini API Key not configured');
-      const google = createGoogleGenerativeAI({ apiKey: settings.geminiKey });
-      aiProvider = google(modelId);
-    } else {
-      throw new Error(`Unsupported AI model: ${aiModel}`);
+      let aiProvider: any;
+      if (aiModel === 'gpt-4o' || aiModel.startsWith('gpt-')) {
+        if (!settings.openaiKey) throw new Error('OpenAI API Key not configured');
+        const openai = createOpenAI({ apiKey: settings.openaiKey });
+        aiProvider = openai(modelId);
+      } else if (aiModel === 'claude-3-5-sonnet') {
+        if (!settings.anthropicKey) throw new Error('Anthropic API Key not configured');
+        const anthropic = createAnthropic({ apiKey: settings.anthropicKey });
+        aiProvider = anthropic(modelId);
+      } else if (aiModel.startsWith('gemini-')) {
+        if (!settings.geminiKey) throw new Error('Gemini API Key not configured');
+        const google = createGoogleGenerativeAI({ apiKey: settings.geminiKey });
+        aiProvider = google(modelId);
+      } else {
+        throw new Error(`Unsupported AI model: ${aiModel}`);
+      }
+
+      await runGeneration(jobId, categoryId, promptTemplate, limit, aiProvider);
+    } catch (err: any) {
+      console.error(`[Job ${job.id}] Setup failed for Database Job ID: ${jobId}:`, err);
+      await prisma.job.update({
+        where: { id: jobId },
+        data: { status: 'failed', errorLogs: String(err?.message || err).slice(0, 1000) }
+      }).catch((updateErr: any) => console.error(`Also failed to record the failure on Job ${jobId}:`, updateErr));
+      throw err;
     }
+  },
+  { connection: redis, concurrency: 1 }
+);
 
+async function runGeneration(jobId: number, categoryId: number, promptTemplate: string, limit: number | undefined, aiProvider: any) {
     // Fetch pending combinations for this category, capped at `limit` so a run
     // only processes the next N rows and leaves the rest 'pending' for a later run.
     const pendingItems = await prisma.masterData.findMany({
@@ -212,10 +233,7 @@ const worker = new Worker<GenerationJobPayload>(
       });
       console.log(`Job ${jobId} completed fully.`);
     }
-
-  },
-  { connection: redis, concurrency: 1 }
-);
+}
 
 worker.on('failed', (job, err) => {
   console.error(`BullMQ Job ${job?.id} failed:`, err);
