@@ -18,6 +18,8 @@ export default function GenerateContentPage() {
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [previewItem, setPreviewItem] = useState<any | null>(null);
+  const [resettingId, setResettingId] = useState<number | null>(null);
+  const [resettingGroup, setResettingGroup] = useState<string | null>(null);
 
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
@@ -40,6 +42,51 @@ export default function GenerateContentPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetRows = async (opts: { ids?: number[]; categoryId?: number; status?: string }) => {
+    try {
+      const res = await fetch('/api/master-data', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset', ...opts })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || 'Failed to reset');
+        return;
+      }
+      await fetchData();
+    } catch (e) {
+      console.error(e);
+      alert('Error connecting to server');
+    }
+  };
+
+  const resetItem = async (item: any) => {
+    if (!confirm(`Reset "${item.service?.name}" - ${item.location?.city} back to pending? This clears its current content.`)) return;
+    setResettingId(item.id);
+    await resetRows({ ids: [item.id] });
+    setResettingId(null);
+    setPreviewItem(null);
+  };
+
+  const resetGroupErrors = async (groupName: string, items: any[]) => {
+    const errorCount = items.filter((i) => i.status === 'error').length;
+    if (errorCount === 0) return;
+    if (!confirm(`Reset ${errorCount} failed item(s) in "${groupName}" back to pending so they can be retried?`)) return;
+    setResettingGroup(groupName);
+    await resetRows({ categoryId: items[0].categoryId, status: 'error' });
+    setResettingGroup(null);
+  };
+
+  const resetGroupAll = async (groupName: string, items: any[]) => {
+    const resettable = items.filter((i) => i.status === 'generated' || i.status === 'error').length;
+    if (resettable === 0) return;
+    if (!confirm(`Reset all ${resettable} generated/error item(s) in "${groupName}" back to pending? This clears their current content.`)) return;
+    setResettingGroup(groupName);
+    await resetRows({ categoryId: items[0].categoryId });
+    setResettingGroup(null);
   };
 
   const categoryOptions = Object.values(
@@ -429,6 +476,28 @@ export default function GenerateContentPage() {
                             <strong style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{groupName}</strong>
                             <span className="badge badge-info" style={{ marginLeft: '4px' }}>{items.length} items</span>
                           </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {items.some((i: any) => i.status === 'error') && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                disabled={resettingGroup === groupName}
+                                onClick={(e) => { e.stopPropagation(); resetGroupErrors(groupName, items); }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                                {resettingGroup === groupName ? 'Resetting...' : `Reset Errors (${items.filter((i: any) => i.status === 'error').length})`}
+                              </button>
+                            )}
+                            {items.some((i: any) => i.status === 'generated' || i.status === 'error') && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ color: 'var(--color-error)' }}
+                                disabled={resettingGroup === groupName}
+                                onClick={(e) => { e.stopPropagation(); resetGroupAll(groupName, items); }}
+                              >
+                                {resettingGroup === groupName ? 'Resetting...' : 'Reset Category'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -457,9 +526,20 @@ export default function GenerateContentPage() {
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-ghost btn-sm" disabled={!item.content && !item.errorMessage} onClick={() => setPreviewItem(item)}>
-                            {item.status === 'error' ? 'View Error' : 'Preview Content'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-ghost btn-sm" disabled={!item.content && !item.errorMessage} onClick={() => setPreviewItem(item)}>
+                              {item.status === 'error' ? 'View Error' : 'Preview Content'}
+                            </button>
+                            {(item.status === 'generated' || item.status === 'error') && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                disabled={resettingId === item.id}
+                                onClick={() => resetItem(item)}
+                              >
+                                {resettingId === item.id ? 'Resetting...' : 'Reset'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -520,6 +600,15 @@ export default function GenerateContentPage() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setPreviewItem(null)}>Close</button>
+              {(previewItem.status === 'generated' || previewItem.status === 'error') && (
+                <button
+                  className="btn btn-ghost"
+                  disabled={resettingId === previewItem.id}
+                  onClick={() => resetItem(previewItem)}
+                >
+                  {resettingId === previewItem.id ? 'Resetting...' : 'Reset to Pending'}
+                </button>
+              )}
             </div>
           </div>
         </div>

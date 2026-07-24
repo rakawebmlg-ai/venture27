@@ -188,3 +188,45 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+// Resets rows back to 'pending' so they can be regenerated: clears content,
+// image, errorMessage, and unpublishes (a published row with wiped content
+// shouldn't stay marked published).
+export async function PATCH(req: Request) {
+  try {
+    const { action, ids, categoryId, status } = await req.json();
+
+    if (action !== 'reset') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+
+    const where: any = {};
+    if (Array.isArray(ids) && ids.length > 0) {
+      where.id = { in: ids.map(Number) };
+    } else if (categoryId) {
+      where.categoryId = Number(categoryId);
+      // Narrow to just 'error' rows for a safe bulk retry, or leave scoped to
+      // both 'generated' and 'error' (never touch rows already 'pending').
+      where.status = status === 'error' || status === 'generated' ? status : { in: ['generated', 'error'] };
+    } else {
+      return NextResponse.json({ error: 'Provide ids or categoryId' }, { status: 400 });
+    }
+
+    const { count } = await prisma.masterData.updateMany({
+      where,
+      data: {
+        status: 'pending',
+        content: null,
+        image: null,
+        errorMessage: null,
+        published: false,
+        publishedAt: null,
+      }
+    });
+
+    return NextResponse.json({ success: true, count });
+  } catch (error) {
+    console.error('Failed to reset master data status:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
