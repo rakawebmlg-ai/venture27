@@ -13,6 +13,10 @@ export default function GenerateContentPage() {
   const [promptContent, setPromptContent] = useState('');
   const [limit, setLimit] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
+  const [savedPrompts, setSavedPrompts] = useState<any[]>([]);
+  const [selectedPromptId, setSelectedPromptId] = useState<number | ''>('');
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [deletingPromptId, setDeletingPromptId] = useState<number | null>(null);
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +29,18 @@ export default function GenerateContentPage() {
 
   useEffect(() => {
     fetchData();
+    fetchPrompts();
   }, []);
+
+  const fetchPrompts = async () => {
+    try {
+      const res = await fetch('/api/prompts');
+      const json = await res.json();
+      setSavedPrompts(json);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -126,12 +141,80 @@ export default function GenerateContentPage() {
     }));
   };
 
+  const savePrompt = async (name: string, content: string) => {
+    try {
+      const res = await fetch('/api/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, content })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || 'Failed to save prompt');
+        return null;
+      }
+      await fetchPrompts();
+      return result;
+    } catch (e) {
+      console.error(e);
+      alert('Error connecting to server');
+      return null;
+    }
+  };
+
   const handlePromptFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setPromptContent(e.target?.result as string);
+    reader.onload = async (e) => {
+      const content = e.target?.result as string;
+      setPromptContent(content);
+      // Uploading a .md/.txt file saves it under its filename, so it shows
+      // up in "Saved Prompts" without a separate save step.
+      const name = file.name.replace(/\.(md|txt)$/i, '');
+      setSavingPrompt(true);
+      const saved = await savePrompt(name, content);
+      setSavingPrompt(false);
+      if (saved) setSelectedPromptId(saved.id);
     };
     reader.readAsText(file);
+  };
+
+  const handleSavePromptClick = async () => {
+    if (!promptContent.trim()) return alert('Write a prompt before saving');
+    const currentName = savedPrompts.find((p) => p.id === selectedPromptId)?.name || '';
+    const name = window.prompt('Save this prompt as:', currentName);
+    if (!name || !name.trim()) return;
+    setSavingPrompt(true);
+    const saved = await savePrompt(name.trim(), promptContent);
+    setSavingPrompt(false);
+    if (saved) setSelectedPromptId(saved.id);
+  };
+
+  const handleSelectPrompt = (value: string) => {
+    const id = value ? Number(value) : '';
+    setSelectedPromptId(id);
+    if (id === '') return;
+    const p = savedPrompts.find((sp) => sp.id === id);
+    if (p) setPromptContent(p.content);
+  };
+
+  const deletePrompt = async (id: number) => {
+    if (!confirm('Delete this saved prompt?')) return;
+    setDeletingPromptId(id);
+    try {
+      const res = await fetch(`/api/prompts?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (selectedPromptId === id) setSelectedPromptId('');
+        await fetchPrompts();
+      } else {
+        const result = await res.json().catch(() => null);
+        alert(result?.error || 'Failed to delete prompt');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error connecting to server');
+    } finally {
+      setDeletingPromptId(null);
+    }
   };
 
   const startGeneration = async () => {
@@ -254,6 +337,41 @@ export default function GenerateContentPage() {
           <div className="card-body">
             <div className="form-group">
               <label className="form-label">Prompt Template</label>
+
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <select
+                  className="form-input"
+                  style={{ flex: 1 }}
+                  value={selectedPromptId}
+                  onChange={(e) => handleSelectPrompt(e.target.value)}
+                  disabled={isGenerating && !isPaused}
+                >
+                  <option value="">{savedPrompts.length > 0 ? 'Load a saved prompt...' : 'No saved prompts yet'}</option>
+                  {savedPrompts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {selectedPromptId !== '' && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: 'var(--color-error)' }}
+                    disabled={deletingPromptId === selectedPromptId}
+                    onClick={() => deletePrompt(selectedPromptId as number)}
+                  >
+                    {deletingPromptId === selectedPromptId ? 'Deleting...' : 'Delete'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={savingPrompt || !promptContent.trim()}
+                  onClick={handleSavePromptClick}
+                >
+                  {savingPrompt ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+
               <label
                 className={`upload-area ${dragOverPrompt ? 'dragover' : ''}`}
                 style={{ padding: '10px', minHeight: 'auto', borderWidth: '1px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}
@@ -263,14 +381,14 @@ export default function GenerateContentPage() {
               >
                 <input type="file" accept=".md,.txt" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) handlePromptFile(e.target.files[0]); }} />
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                <span className="upload-area-text" style={{ fontSize: '12px' }}>{promptContent.trim() ? 'Drop another file to replace the prompt below' : 'Drop prompt.md here or click to upload (optional)'}</span>
+                <span className="upload-area-text" style={{ fontSize: '12px' }}>{savingPrompt ? 'Saving prompt.md...' : promptContent.trim() ? 'Drop another file to replace the prompt below (auto-saved)' : 'Drop prompt.md here or click to upload (auto-saved)'}</span>
               </label>
               <textarea
                 className="form-input"
                 style={{ minHeight: '160px', fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: 1.6, resize: 'vertical' }}
-                placeholder={'Write your prompt template here, or upload one above. Example:\nWrite a 300-word SEO article about {{service_name}} for {{city}}, {{province}}.'}
+                placeholder={'Write your prompt template here, or upload/load one above. Example:\nWrite a 300-word SEO article about {{service_name}} for {{city}}, {{province}}.'}
                 value={promptContent}
-                onChange={(e) => setPromptContent(e.target.value)}
+                onChange={(e) => { setPromptContent(e.target.value); setSelectedPromptId(''); }}
                 disabled={isGenerating && !isPaused}
               />
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>

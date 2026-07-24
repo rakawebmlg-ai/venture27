@@ -76,6 +76,14 @@ model MasterData {
   @@unique([categoryId, locationId, serviceId])
 }
 
+model PromptTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Job {
   id           Int      @id @default(autoincrement())
   status       String   @default("running") // running, paused, stopped, completed
