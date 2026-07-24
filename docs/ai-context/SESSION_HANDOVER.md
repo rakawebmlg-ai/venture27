@@ -5,7 +5,8 @@
 
 ## Current Objective
 1. Fixed the "Generate Master Data" flow on `/master-data` (placeholder rendering, service template refresh, delete support).
-2. Added a batch "Limit" to `/generate-content` so the user can generate N rows now and continue later without re-processing already-done rows.
+2. Added a batch "Limit" and a Category picker to `/generate-content` so the user can choose a category, generate N rows now, and continue later without re-processing already-done rows.
+3. Added a new `/publish-content` menu to review generated articles (grouped by City/Community/County, Province, Category, Service Name) and mark them "published" (internal status flag - user explicitly confirmed no public-facing route is wanted) via an Import action, with Unpublish to undo. Added `MasterData.published`/`publishedAt` via `prisma db push`.
 
 ## Current Task
 Done for this session. Awaiting user's next command (deploy/push, or continue with Pending items below).
@@ -26,11 +27,15 @@ Done for this session. Awaiting user's next command (deploy/push, or continue wi
 - Result Guide page UI.
 
 ## Files Modified Recently
-- `apps/frontend/app/api/master-data/route.ts` — GET now renders `{{City}}`/`{{Province}}` placeholders per row; POST now updates an existing Service's meta template on re-upload instead of ignoring it, trims CSV header/value whitespace + BOM, and returns `skippedLocationRows` / `skippedServiceRows` / `skippedExistingCombos` counts; added DELETE (single `?id=`, category-wide `?categoryId=`, or batch `{ ids }`).
+- `apps/frontend/app/api/master-data/route.ts` — GET now renders `{{City}}`/`{{Province}}` placeholders per row; POST now updates an existing Service's meta template on re-upload instead of ignoring it, trims CSV header/value whitespace + BOM, and returns `skippedLocationRows` / `skippedServiceRows` / `skippedExistingCombos` counts; added DELETE (single `?id=`, category-wide `?categoryId=`, or batch `{ ids }`); placeholder renderer now imported from `app/lib/placeholders.ts`.
 - `apps/frontend/app/master-data/page.tsx` — `executeCombine` now surfaces a specific alert (created count, or the reason zero rows were created) instead of a generic success/failure message; added a per-row delete button and a "Delete Category" bulk action.
-- `apps/frontend/app/generate-content/page.tsx` — added a "Limit" input to cap a generation run to the next N pending rows; the Start button relabels to "Continue Generation (N remaining)" once a previous batch has run.
+- `apps/frontend/app/generate-content/page.tsx` — added a "Limit" input to cap a generation run to the next N pending rows (Start button relabels to "Continue Generation (N remaining)" once a previous batch has run), plus a Category dropdown (shows pending/total per category) so the user picks which category to generate instead of it defaulting to whatever the first pending row belonged to.
 - `apps/frontend/app/api/generate/route.ts` — 'start' action accepts `limit`, computes `totalItems = min(limit, pendingCount)`, and always forwards an explicit `limit` to the BullMQ job.
 - `apps/backend/src/index.ts` — worker now fetches pending items `orderBy: id asc` with `take: limit` so batches are deterministic and don't overlap; fixed progress to be scoped to the current batch (was counting category-wide 'generated' rows, which broke as soon as a second batch ran); fixed a bug where marking a job 'completed' tried to set a non-existent `completedAt` field and silently threw, so 100%-complete jobs never flipped to 'completed' and the UI spun forever - completion is now decided by whether the loop ran to the end, not just `progress >= 100` (so one failed item no longer blocks completion).
+- `packages/database/prisma/schema.prisma` — added `MasterData.published Boolean @default(false)` and `MasterData.publishedAt DateTime?`. Applied with `npx prisma db push` in `packages/database` (had to stop both dev servers first - see Problems Encountered below - then restart them).
+- New `apps/frontend/app/publish-content/page.tsx` + `apps/frontend/app/api/publish/route.ts` — the Publish Content menu described in Current Objective #3.
+- New `apps/frontend/app/lib/placeholders.ts` — `renderPlaceholders` factored out of the master-data route so `/api/publish` can reuse it.
+- `apps/frontend/app/components/Sidebar.tsx` — added "Publish Content" nav item (Post-Generation section, above History).
 
 ## Important Context
 - The project is a Monorepo. Use npm workspaces (`npm run dev --workspace=@venture27/frontend`).
@@ -61,9 +66,10 @@ Done for this session. Awaiting user's next command (deploy/push, or continue wi
 
 ## Recommended Next Actions
 1. Implement `nodemailer` in `apps/backend/src/index.ts` to dispatch completion emails based on the `Settings` table.
-2. Build the UI for the `/result-guide` page.
+2. `/result-guide` is still a fully static/mocked page (hardcoded numbers, fake URLs like `service.venture27.com/...`) - it describes a `{service}/{province}/{city}/{county}/{community}` URL hierarchy that doesn't exist in the schema. If the user later wants real public-facing pages (as opposed to the internal "published" status flag added this session), this page + a real location-type taxonomy would need to be built together.
 3. Remove or fix `apps/frontend/worker.ts` (pg-boss) since it's dead code that can never run against the BullMQ queue used by `apps/frontend/app/api/generate/route.ts` + `apps/backend/src/index.ts`.
 4. The `pause`/`resume` actions in `apps/frontend/app/api/generate/route.ts` are still broken: `resume` only flips the Job row back to `status: 'running'` in the DB but never re-enqueues a BullMQ job, so a paused job hangs forever (confirmed by reading the code and its own inline comment; not fixed this session — out of scope for the "limit and continue" feature, which sidesteps it entirely by starting a fresh job per batch instead of relying on pause/resume). Worth fixing or removing the Pause button if it's not going to be wired up properly.
+5. `/publish-content`'s "published" flag is purely internal (confirmed with the user - no slug, no public route, no sitemap). If that changes later, expect to add a slug field, a public-facing route/API, and reconcile with whatever `/result-guide`'s URL structure ends up being.
 
 ## Instructions For The Next AI
 - Continue from the current project state.
