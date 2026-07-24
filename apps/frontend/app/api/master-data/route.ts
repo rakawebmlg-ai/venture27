@@ -1,16 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@venture27/database';
 import Papa from 'papaparse';
-
-// Replaces {{City}} / {{Province}} placeholders (case-insensitive) with the
-// row's actual location values, so each location x service combination shows
-// its own rendered meta title/description/heading/subheading.
-function renderPlaceholders(text: string | null | undefined, city: string, province: string): string | null {
-  if (!text) return text ?? null;
-  return text
-    .replace(/\{\{\s*city\s*\}\}/gi, city)
-    .replace(/\{\{\s*province\s*\}\}/gi, province);
-}
+import { renderPlaceholders } from '../../lib/placeholders';
 
 export async function GET(req: Request) {
   try {
