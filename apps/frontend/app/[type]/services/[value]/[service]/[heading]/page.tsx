@@ -1,13 +1,15 @@
 import { prisma } from '@venture27/database';
 import { notFound } from 'next/navigation';
-import { renderPlaceholders } from '../../../../lib/placeholders';
-import { combineLocationName } from '../../../../lib/location';
+import { renderPlaceholders } from '../../../../../lib/placeholders';
+import { combineLocationName } from '../../../../../lib/location';
 
-// The [city] segment is really "whichever of City/Community/County was
-// primary at import time" (see lib/location.ts#primaryLocationName) - it's
-// just the folder/param name, not a guarantee the value is actually a city.
-async function getPage(city: string, category: string, service: string) {
-  const slug = `/${city}/services/${category}/${service}`;
+// [type] is 'city' | 'community' | 'county' (whichever was primary for this
+// row at import time - see lib/location.ts#primaryLocationType), [value] is
+// that field's slugified value. The full path is matched against the
+// stored MasterData.slug rather than parsed apart, since that's the exact
+// same string computed by /api/publish at import time.
+async function getPage(type: string, value: string, service: string, heading: string) {
+  const slug = `/${type}/services/${value}/${service}/${heading}`;
   return prisma.masterData.findFirst({
     where: { slug, published: true },
     include: { location: true, service: true, category: true }
@@ -15,8 +17,8 @@ async function getPage(city: string, category: string, service: string) {
 }
 
 export async function generateMetadata({ params }) {
-  const { city, category, service } = await params;
-  const item = await getPage(city, category, service);
+  const { type, value, service, heading } = await params;
+  const item = await getPage(type, value, service, heading);
   if (!item) return {};
 
   const metaTitle = renderPlaceholders(item.service.metaTitle, item.location) || item.service.name;
@@ -29,13 +31,13 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ProgrammaticPage({ params }) {
-  const { city, category, service } = await params;
-  const item = await getPage(city, category, service);
+  const { type, value, service, heading } = await params;
+  const item = await getPage(type, value, service, heading);
   if (!item) notFound();
 
   const { city: cityName, community, county, province } = item.location;
   const locationLabel = combineLocationName(cityName, community, county);
-  const heading = renderPlaceholders(item.service.heading, item.location) || item.service.name;
+  const renderedHeading = renderPlaceholders(item.service.heading, item.location) || item.service.name;
   const subheading = renderPlaceholders(item.service.subheading, item.location);
 
   return (
@@ -56,7 +58,7 @@ export default async function ProgrammaticPage({ params }) {
             prompts are instructed to), skip rendering a second one here. */}
         {!/<h1[\s>]/i.test(item.content || '') && (
           <>
-            <h1 style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1.25, margin: '0 0 12px', color: '#f9fafb' }}>{heading}</h1>
+            <h1 style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1.25, margin: '0 0 12px', color: '#f9fafb' }}>{renderedHeading}</h1>
             {subheading && (
               <p style={{ fontSize: '17px', color: '#9ca3af', margin: '0 0 32px', lineHeight: 1.6 }}>{subheading}</p>
             )}

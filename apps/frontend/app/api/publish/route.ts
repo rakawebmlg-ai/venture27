@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@venture27/database';
 import { renderPlaceholders } from '../../lib/placeholders';
 import { buildSlug } from '../../lib/slug';
-import { primaryLocationName } from '../../lib/location';
+import { primaryLocationType } from '../../lib/location';
 
 export async function GET(req: Request) {
   try {
@@ -80,8 +80,14 @@ export async function POST(req: Request) {
 
     let count = 0;
     for (const row of rows) {
-      const place = primaryLocationName(row.location.city, row.location.community, row.location.county);
-      const slug = buildSlug(place, row.category?.name || '', row.service.name);
+      const located = primaryLocationType(row.location.city, row.location.community, row.location.county);
+      if (!located) {
+        // Shouldn't happen (a Location always has at least one of the three
+        // by the time it's created), but skip rather than crash the batch.
+        continue;
+      }
+      const heading = renderPlaceholders(row.service.heading, row.location) || row.service.name;
+      const slug = buildSlug(located.type, located.value, row.service.name, heading);
       try {
         await prisma.masterData.update({
           where: { id: row.id },

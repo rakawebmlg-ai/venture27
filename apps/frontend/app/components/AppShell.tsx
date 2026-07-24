@@ -4,11 +4,13 @@ import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import TopHeader from './TopHeader';
 
-// Public programmatic pages (/{city}/services/{category}/{service}) are
-// meant to look like a standalone landing page, not a page inside the admin
-// dashboard - so the sidebar/top header are skipped for exactly that URL
-// shape and shown for everything else (all the existing dashboard routes).
-const PROGRAMMATIC_PAGE_PATTERN = /^\/[^/]+\/services\/[^/]+\/[^/]+\/?$/;
+// Public programmatic pages (/{type}/services/{value}/{service}/{heading})
+// are meant to look like a standalone landing page, not a page inside the
+// admin dashboard - so the sidebar/top header are skipped for exactly that
+// URL shape and shown for everything else (all the existing dashboard
+// routes, including /services/city etc., which have "services" as their
+// FIRST segment rather than their second and so never match this).
+const PROGRAMMATIC_PAGE_PATTERN = /^\/[^/]+\/services\/[^/]+\/[^/]+\/[^/]+\/?$/;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

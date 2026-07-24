@@ -56,7 +56,7 @@ const navItems = [
       },
       {
         label: 'Service',
-        href: '/services',
+        href: '/services/city',
         icon: (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 7h-9" />
@@ -65,6 +65,11 @@ const navItems = [
             <circle cx="7" cy="7" r="3" />
           </svg>
         ),
+        children: [
+          { label: 'City', href: '/services/city' },
+          { label: 'Community', href: '/services/community' },
+          { label: 'County', href: '/services/county' },
+        ],
       },
       {
         label: 'History',
@@ -124,17 +129,33 @@ export default function Sidebar() {
         {navItems.map((section) => (
           <div key={section.section}>
             <div className="sidebar-section-label">{section.section}</div>
-            {section.items.map((item) => {
+            {section.items.map((item: any) => {
               const isActive = pathname === item.href;
+              const isParentActive = item.children?.some((c: any) => pathname === c.href);
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <span className="sidebar-nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`sidebar-nav-item ${isActive || isParentActive ? 'active' : ''}`}
+                  >
+                    <span className="sidebar-nav-icon">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                  {item.children && (
+                    <div>
+                      {item.children.map((child: any) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`sidebar-nav-item ${pathname === child.href ? 'active' : ''}`}
+                          style={{ paddingLeft: '48px', fontSize: '13px' }}
+                        >
+                          <span>{child.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

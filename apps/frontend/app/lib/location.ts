@@ -14,3 +14,16 @@ export function combineLocationName(city?: string | null, community?: string | n
 export function primaryLocationName(city?: string | null, community?: string | null, county?: string | null): string {
   return community || city || county || '';
 }
+
+export type LocationType = 'city' | 'community' | 'county';
+
+// Which field is "the" one identifying this location, and its value - same
+// priority as primaryLocationName, but also names which field won. Used to
+// build the /{type}/services/... slug and to route a page into the
+// City/Community/County Service sub-section it belongs to.
+export function primaryLocationType(city?: string | null, community?: string | null, county?: string | null): { type: LocationType; value: string } | null {
+  if (community) return { type: 'community', value: community };
+  if (city) return { type: 'city', value: city };
+  if (county) return { type: 'county', value: county };
+  return null;
+}
