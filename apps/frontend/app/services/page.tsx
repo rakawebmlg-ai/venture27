@@ -14,11 +14,22 @@ const slugFor = (item: any) => item.slug || buildSlug(
   item.service?.name || ''
 );
 
+// What the table is grouped by - Category (the original default) or one of
+// the three location levels, so City/Community/County each show up as their
+// own "sub service" breakdown that expands to its matching pages on click.
+const GROUP_BY_OPTIONS = [
+  { key: 'category', label: 'Category', getValue: (item: any) => item.category?.name || 'Uncategorized' },
+  { key: 'city', label: 'City', getValue: (item: any) => item.location?.city || 'No City' },
+  { key: 'community', label: 'Community', getValue: (item: any) => item.location?.community || 'No Community' },
+  { key: 'county', label: 'County', getValue: (item: any) => item.location?.county || 'No County' },
+] as const;
+
 export default function ServicesPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState<string>('');
+  const [groupBy, setGroupBy] = useState<typeof GROUP_BY_OPTIONS[number]['key']>('category');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [unpublishingId, setUnpublishingId] = useState<number | null>(null);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
@@ -62,10 +73,12 @@ export default function ServicesPage() {
     (item.category && item.category.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const activeGroupBy = GROUP_BY_OPTIONS.find((g) => g.key === groupBy)!;
+
   const groupedData = filteredData.reduce((acc, item) => {
-    const cName = item.category?.name || 'Uncategorized';
-    if (!acc[cName]) acc[cName] = [];
-    acc[cName].push(item);
+    const key = activeGroupBy.getValue(item);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
     return acc;
   }, {} as Record<string, typeof filteredData>);
 
@@ -159,6 +172,19 @@ export default function ServicesPage() {
         </div>
       </div>
 
+      <div className="tabs">
+        {GROUP_BY_OPTIONS.map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            className={`tab-item ${groupBy === opt.key ? 'active' : ''}`}
+            onClick={() => { setGroupBy(opt.key); setExpandedGroups({}); }}
+          >
+            Group by {opt.label}
+          </button>
+        ))}
+      </div>
+
       <div className="card">
         <div className="card-header">
           <span className="card-title">{selectedService || 'All Services'}</span>
@@ -200,7 +226,7 @@ export default function ServicesPage() {
                             >
                               <polyline points="9 18 15 12 9 6" />
                             </svg>
-                            <span className="badge badge-neutral" style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>CATEGORY</span>
+                            <span className="badge badge-neutral" style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>{activeGroupBy.label}</span>
                             <strong style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{groupName}</strong>
                             <span className="badge badge-info" style={{ marginLeft: '4px' }}>{items.length} items</span>
                           </div>
