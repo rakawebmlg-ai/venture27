@@ -1,6 +1,15 @@
-version: '3.8'
-
 services:
+  # Init container: carries venture27.dump (pg_dump custom format) and copies it
+  # into the shared `dumpdata` volume so `db` can pg_restore from it on first boot.
+  # Runs once and exits; `db` waits for it via depends_on.
+  dbdump:
+    image: rakawebmlg/venture27-dbdump:latest
+    platform: linux/amd64
+    container_name: venture27-dbdump
+    command: ["/bin/sh", "-c", "cp -f /venture27.dump /dump/venture27.dump && echo 'dump staged at /dump/venture27.dump'"]
+    volumes:
+      - dumpdata:/dump
+
   db:
     image: postgres:15
     container_name: venture27-db
@@ -13,6 +22,17 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - dumpdata:/dump:ro
+      # Only executed when pgdata is empty (fresh volume) — see the script header.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    depends_on:
+      dbdump:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d venture27"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:alpine
@@ -20,6 +40,12 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:
+  dumpdata:
