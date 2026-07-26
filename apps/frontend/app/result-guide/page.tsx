@@ -71,7 +71,7 @@ export default function ResultGuidePage() {
               <div>https://service.venture27.com/<span style={{ color: 'var(--color-blue-400)' }}>{'{service}'}</span>/<span style={{ color: 'var(--color-success)' }}>{'{province}'}</span>/<span style={{ color: 'var(--color-warning)' }}>{'{city}'}</span>/<span style={{ color: '#a855f7' }}>{'{county}'}</span>/<span style={{ color: 'var(--color-info)' }}>{'{community}'}</span></div>
             </div>
             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '12px' }}>
-              Example: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue-300)', background: 'rgba(59,130,246,0.08)', padding: '2px 6px', borderRadius: '3px' }}>
+              Example: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue-300)', background: 'rgba(91,235,205,0.08)', padding: '2px 6px', borderRadius: '3px' }}>
                 https://service.venture27.com/plumbing-services/jawa-barat/bandung/coblong/dago
               </code>
             </p>

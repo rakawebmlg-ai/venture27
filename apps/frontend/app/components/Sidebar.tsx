@@ -117,9 +117,8 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">V27</div>
+          <img src="/venture27-logo.png" alt="Venture27" className="sidebar-brand-logo" />
           <div className="sidebar-brand-text">
-            <h1>Venture 27</h1>
             <span>Data Generator</span>
           </div>
         </div>

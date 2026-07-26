@@ -49,6 +49,35 @@ export async function generateMetadata({ params }) {
   };
 }
 
+// Nav items and footer link columns mirror the approved Figma design's
+// chrome (same on every generated page), but none of these destinations
+// exist yet in this app (there's no public marketing site, just this one
+// page type) - per explicit decision, they render visually but stay inert
+// (href="#") until real pages exist, rather than link into the internal
+// admin dashboard or 404.
+const NAV_ITEMS = ['Home', 'Services', 'Our Approach', 'Why Choose Us', 'Recent work', 'Contact'];
+
+const FOOTER_COLUMNS = [
+  {
+    title: 'Services',
+    links: [
+      'Interface Design', 'Mobile App Development', 'Web Application Development',
+      'Custom Software Development', 'Digital Product Engineering', 'Digital Marketing',
+      'Search Engine Optimization', 'Websites That Convert', 'Digital Commerce',
+      'Digital Transformation', 'Cloud & DevOps', 'Artificial Intelligence',
+      'Cybersecurity', 'ERP Systems', 'CRM Systems',
+    ],
+  },
+  {
+    title: 'Venture27',
+    links: ['About', 'Contact', 'Request A Call', 'Request Estimate'],
+  },
+  {
+    title: 'Legal',
+    links: ['Blog', 'Privacy and Policy', 'Terms and Conditions'],
+  },
+];
+
 export default async function ProgrammaticPage({ params }) {
   const { type, value, service, heading } = await params;
   const item = await getPage(type, value, service, heading);
@@ -76,57 +105,197 @@ export default async function ProgrammaticPage({ params }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0e14', color: '#e5e7eb' }}>
+    <div className="ppage">
       {/* eslint-disable-next-line react/no-danger */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px' }}>
-        <div style={{ maxWidth: '760px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'linear-gradient(135deg,#3b82f6,#22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#0a0e14' }}>V27</div>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#9ca3af' }}>{item.category?.name}</span>
+      <nav className="ppage-navbar">
+        <div className="ppage-navbar-inner">
+          <img src="/venture27-logo.png" alt="Venture27" className="ppage-logo" />
+          <div className="ppage-nav-links">
+            {NAV_ITEMS.map((label) => (
+              <span
+                key={label}
+                className={`ppage-nav-link ${label === 'Services' ? 'is-active' : ''}`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <span className="ppage-cta-button">
+            Request an Estimate
+          </span>
         </div>
-      </header>
+      </nav>
 
-      <main style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px 80px' }}>
-        <nav aria-label="Breadcrumb" style={{ fontSize: '13px', color: '#3b82f6', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '12px', textTransform: 'uppercase' }}>
-          {locationLabel}, {province}
-        </nav>
+      <main className="ppage-main">
+        <div className="ppage-main-col">
+          <span className="ppage-back-link">
+            <img src="/service-page/icon-back.svg" alt="" width={14} height={14} />
+            Back to services
+          </span>
 
-        {/* If the generated content already includes its own <h1> (most
-            prompts are instructed to), skip rendering a second one here -
-            a page should only ever have one <h1>. */}
-        {!/<h1[\s>]/i.test(item.content || '') && (
-          <>
-            <h1 style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1.25, margin: '0 0 12px', color: '#f9fafb' }}>{renderedHeading}</h1>
-            {subheading && (
-              <p style={{ fontSize: '17px', color: '#9ca3af', margin: '0 0 32px', lineHeight: 1.6 }}>{subheading}</p>
-            )}
-          </>
-        )}
+          <div className="ppage-eyebrow">{locationLabel}, {province}</div>
 
-        <article
-          className="programmatic-content"
-          dangerouslySetInnerHTML={{ __html: item.content || '<p>Content coming soon.</p>' }}
-        />
+          {/* If the generated content already includes its own <h1> (most
+              prompts are instructed to), skip rendering a second one here -
+              a page should only ever have one <h1>. */}
+          {!/<h1[\s>]/i.test(item.content || '') && (
+            <>
+              <h1 className="ppage-h1">{renderedHeading}</h1>
+              {subheading && <p className="ppage-subheading">{subheading}</p>}
+            </>
+          )}
 
-        <footer style={{ marginTop: '56px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: '#6b7280' }}>
-          {item.service?.name} &middot; {locationLabel}, {province}
-        </footer>
+          <article
+            className="ppage-content"
+            dangerouslySetInnerHTML={{ __html: item.content || '<p>Content coming soon.</p>' }}
+          />
+
+          <footer className="ppage-content-footer">
+            {item.service?.name} &middot; {locationLabel}, {province}
+          </footer>
+        </div>
+
+        {/* Static lead-capture form matching the mockup - not wired to any
+            backend yet (this app has no lead/CRM storage), so the submit
+            control is a plain non-submitting button rather than a real
+            <form action>, consistent with the nav/footer links elsewhere on
+            this page also being visual-only until a real destination exists. */}
+        <aside className="ppage-form-card">
+          <div className="ppage-form-heading">Request Estimate</div>
+          <p className="ppage-form-intro">
+            Have a specific question or request? Fill out the form below, and we'll get back to you as soon as possible, usually within one business day.
+          </p>
+
+          <div className="ppage-form-fields">
+            <div className="ppage-form-field">
+              <label className="ppage-form-label">Name <span className="ppage-form-required">*</span></label>
+              <input type="text" placeholder="Full Name" className="ppage-form-input" />
+            </div>
+            <div className="ppage-form-field">
+              <label className="ppage-form-label">Email <span className="ppage-form-required">*</span></label>
+              <input type="email" placeholder="email@domain.com" className="ppage-form-input" />
+            </div>
+            <div className="ppage-form-field">
+              <label className="ppage-form-label">Phone</label>
+              <div className="ppage-form-phone">
+                <img src="/service-page/icon-flag-us.svg" alt="" width={32} height={24} />
+                <span className="ppage-form-phone-code">+1</span>
+                <img src="/service-page/icon-caret-down.svg" alt="" width={14} height={14} />
+                <input type="tel" placeholder="xxxx-xxxx-xxxx" className="ppage-form-phone-input" />
+              </div>
+            </div>
+            <div className="ppage-form-field">
+              <label className="ppage-form-label">Company</label>
+              <input type="text" placeholder="Company Name" className="ppage-form-input" />
+            </div>
+            <div className="ppage-form-field">
+              <label className="ppage-form-label">How Can We Help? <span className="ppage-form-required">*</span></label>
+              <textarea placeholder="Your message..." className="ppage-form-textarea" rows={4} />
+            </div>
+          </div>
+
+          <button type="button" className="ppage-form-submit">Request an Estimate</button>
+        </aside>
       </main>
 
+      <footer className="ppage-footer">
+        <div className="ppage-footer-inner">
+          <div className="ppage-footer-col ppage-footer-company">
+            <img src="/venture27-logo.png" alt="Venture27" className="ppage-footer-logo" />
+            <p className="ppage-footer-about">
+              From concept to launch, we design, build, and scale web &amp; mobile apps, custom software, and digital solutions — all under one roof.
+            </p>
+            <p className="ppage-footer-copyright">Copyright &copy; {new Date().getFullYear()} Venture27</p>
+          </div>
+          {FOOTER_COLUMNS.map((col) => (
+            <div key={col.title} className="ppage-footer-col">
+              <div className="ppage-footer-title">{col.title.toUpperCase()}</div>
+              {col.links.map((label) => (
+                <span key={label} className="ppage-footer-link">
+                  {label}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </footer>
+
       <style dangerouslySetInnerHTML={{ __html: `
-        .programmatic-content { font-size: 16px; line-height: 1.75; color: #d1d5db; }
-        .programmatic-content h1 { font-size: 34px; font-weight: 800; line-height: 1.25; color: #f9fafb; margin: 0 0 16px; }
-        .programmatic-content h2 { font-size: 24px; font-weight: 700; color: #f3f4f6; margin: 40px 0 16px; }
-        .programmatic-content h3 { font-size: 19px; font-weight: 700; color: #f3f4f6; margin: 28px 0 12px; }
-        .programmatic-content p { margin: 0 0 18px; }
-        .programmatic-content ul { margin: 0 0 18px; padding-left: 22px; }
-        .programmatic-content li { margin-bottom: 8px; }
-        .programmatic-content strong { color: #f3f4f6; }
-        .programmatic-content a { color: #3b82f6; }
+        .ppage { min-height: 100vh; background: #090A0E; color: #FFFFFF; font-family: var(--font-inter), Inter, sans-serif; }
+
+        /* Navbar */
+        .ppage-navbar { position: sticky; top: 0; z-index: 10; background: rgba(0,0,0,0.05); backdrop-filter: blur(50px); border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%) 1; }
+        .ppage-navbar-inner { max-width: 1512px; margin: 0 auto; padding: 14px 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+        .ppage-logo { width: 235px; height: 38px; display: block; }
+        .ppage-nav-links { display: flex; align-items: center; gap: 8px; }
+        .ppage-nav-link { padding: 8px 16px; border-radius: 999px; font-size: 14px; color: #99A1AF; text-decoration: none; white-space: nowrap; cursor: default; }
+        .ppage-nav-link.is-active { background: rgba(255,255,255,0.05); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.1); }
+        .ppage-cta-button { flex-shrink: 0; padding: 14px; border-radius: 10px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.15); color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; text-align: center; cursor: default; }
+
+        /* Main */
+        .ppage-main { max-width: 1400px; margin: 0 auto; padding: 48px 24px 80px; display: flex; align-items: flex-start; gap: 24px; }
+        .ppage-main-col { flex: 1 1 auto; min-width: 0; max-width: 900px; }
+        .ppage-back-link { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #99A1AF; text-decoration: none; margin-bottom: 24px; cursor: default; }
+        .ppage-eyebrow { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: #99A1AF; margin-bottom: 12px; }
+        .ppage-h1 { font-size: 40px; font-weight: 500; line-height: 1.25; color: #FFFFFF; margin: 0 0 16px; }
+        .ppage-subheading { font-size: 18px; font-weight: 500; line-height: 1.5; color: #6A7282; margin: 0 0 40px; max-width: 620px; }
+
+        .ppage-content { font-size: 16px; line-height: 1.6; color: #99A1AF; }
+        .ppage-content h1 { font-size: 40px; font-weight: 500; line-height: 1.25; color: #FFFFFF; margin: 0 0 16px; }
+        .ppage-content h2 { font-size: 30px; font-weight: 500; line-height: 1.5; color: #FFFFFF; margin: 0; padding: 44px 0 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .ppage-content h2:first-child { border-top: none; padding-top: 0; }
+        .ppage-content h3 { font-size: 18px; font-weight: 500; line-height: 1.4; color: #FFFFFF; margin: 28px 0 12px; }
+        .ppage-content p { margin: 0 0 18px; }
+        .ppage-content ul { list-style: none; margin: 0 0 18px; padding: 0; }
+        .ppage-content li { position: relative; padding-left: 20px; margin-bottom: 10px; }
+        .ppage-content li::before { content: ''; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: #5BEBCD; }
+        .ppage-content strong { color: #FFFFFF; }
+        .ppage-content a { color: #5BEBCD; }
+
+        .ppage-content-footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12px; color: #6A7282; }
+
+        /* Request-estimate form card */
+        .ppage-form-card { flex: 0 0 458px; width: 458px; max-width: 100%; display: flex; flex-direction: column; gap: 34px; padding: 24px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); border-radius: 20px; backdrop-filter: blur(12px); position: sticky; top: 96px; }
+        .ppage-form-heading { font-size: 24px; font-weight: 500; color: #FFFFFF; text-align: center; }
+        .ppage-form-intro { font-size: 14px; line-height: 1.45; color: #99A1AF; text-align: center; margin: -22px 0 0; }
+        .ppage-form-fields { display: flex; flex-direction: column; gap: 18px; }
+        .ppage-form-field { display: flex; flex-direction: column; gap: 8px; }
+        .ppage-form-label { font-size: 14px; color: #E5E7EB; }
+        .ppage-form-required { color: #EF4444; }
+        .ppage-form-input, .ppage-form-textarea { font: inherit; font-size: 16px; color: #FFFFFF; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; }
+        .ppage-form-input::placeholder, .ppage-form-textarea::placeholder { color: #6A7282; }
+        .ppage-form-textarea { resize: vertical; min-height: 90px; }
+        .ppage-form-phone { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; }
+        .ppage-form-phone-code { font-size: 16px; color: #6A7282; }
+        .ppage-form-phone-input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: #FFFFFF; background: transparent; border: none; outline: none; }
+        .ppage-form-phone-input::placeholder { color: #6A7282; }
+        .ppage-form-submit { font: inherit; font-size: 14px; font-weight: 500; color: #FFFFFF; text-align: center; padding: 14px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; cursor: default; }
+
+        @media (max-width: 1100px) {
+          .ppage-main { flex-direction: column; }
+          .ppage-form-card { position: static; width: 100%; }
+        }
+
+        /* Footer */
+        .ppage-footer { border-top: 1px solid transparent; border-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 100%) 1; margin-top: 40px; }
+        .ppage-footer-inner { max-width: 1512px; margin: 0 auto; padding: 48px 24px; display: flex; flex-wrap: wrap; gap: 28px; }
+        .ppage-footer-col { flex: 1 1 200px; display: flex; flex-direction: column; gap: 14px; }
+        .ppage-footer-title { font-size: 14px; font-weight: 600; color: #FFFFFF; }
+        .ppage-footer-link { font-size: 14px; color: #99A1AF; text-decoration: none; cursor: default; }
+        .ppage-footer-company { flex: 0 0 340px; max-width: 340px; margin-right: 114px; }
+        .ppage-footer-logo { width: 173px; height: 28px; align-self: flex-start; margin-bottom: 4px; }
+        .ppage-footer-about { font-size: 14px; line-height: 1.45; color: #99A1AF; margin: 0; }
+        .ppage-footer-copyright { font-size: 12px; color: #6A7282; margin: 0; }
+
+        @media (max-width: 900px) {
+          .ppage-nav-links { display: none; }
+          .ppage-footer-company { margin-right: 0; flex-basis: 100%; }
+        }
       ` }} />
     </div>
   );
