@@ -8,6 +8,8 @@ export default function GenerateContentPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [generatedCount, setGeneratedCount] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
   const [dragOverPrompt, setDragOverPrompt] = useState(false);
   const [aiModel, setAiModel] = useState('gpt-4o');
   const [enableSmtp, setEnableSmtp] = useState(true);
@@ -31,7 +33,30 @@ export default function GenerateContentPage() {
   useEffect(() => {
     fetchData();
     fetchPrompts();
+    reattachActiveJob();
   }, []);
+
+  // Generation runs entirely in the backend BullMQ worker, independent of
+  // this page - navigating away (or closing the browser) never stops it.
+  // This just reattaches the UI (progress bar, jobId, poll interval) to
+  // whatever job is still running/paused, so it doesn't look stopped after
+  // a remount.
+  const reattachActiveJob = async () => {
+    try {
+      const res = await fetch('/api/generate');
+      const job = await res.json();
+      if (job && (job.status === 'running' || job.status === 'paused')) {
+        setJobId(job.id);
+        setProgress(job.progress);
+        setGeneratedCount(job.generatedCount || 0);
+        setErrorCount(job.errorCount || 0);
+        setIsGenerating(true);
+        setIsPaused(job.status === 'paused');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchPrompts = async () => {
     try {
@@ -232,6 +257,8 @@ export default function GenerateContentPage() {
     setIsGenerating(true);
     setIsPaused(false);
     setProgress(0);
+    setGeneratedCount(0);
+    setErrorCount(0);
 
     try {
       const res = await fetch('/api/generate', {
@@ -301,6 +328,8 @@ export default function GenerateContentPage() {
           
           if (job) {
             setProgress(job.progress);
+            setGeneratedCount(job.generatedCount || 0);
+            setErrorCount(job.errorCount || 0);
             if (job.status === 'completed') {
               setIsGenerating(false);
               setProgress(100);
@@ -556,6 +585,18 @@ export default function GenerateContentPage() {
                     }}
                   ></div>
                 </div>
+                {(generatedCount > 0 || errorCount > 0) && (
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '12px' }}>
+                    <span style={{ color: 'var(--color-success)' }}>
+                      <span className="badge-dot" style={{ display: 'inline-block', marginRight: '5px' }}></span>
+                      {generatedCount} generated
+                    </span>
+                    <span style={{ color: 'var(--color-error)' }}>
+                      <span className="badge-dot" style={{ display: 'inline-block', marginRight: '5px' }}></span>
+                      {errorCount} error
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -154,6 +154,7 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
         break; // Stop processing, resume will create a new worker run
       }
 
+      let succeeded = false;
       try {
         const place = primaryLocationName(item.location.city, item.location.community, item.location.county);
         console.log(`Processing MasterData ID ${item.id} - ${place} - ${item.service.name}`);
@@ -214,6 +215,7 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
             image: `${place.toLowerCase().replace(/\s+/g, '-')}-${item.service.name.toLowerCase().replace(/\s+/g, '-')}.jpg`
           }
         });
+        succeeded = true;
       } catch (err: any) {
         console.error(`Error generating for ID ${item.id}:`, err);
         const errorMessage = String(err?.message || err).slice(0, 1000);
@@ -225,12 +227,17 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
 
       // Progress is scoped to this run's batch (attempted, not just successful,
       // so a single failed item doesn't stall the bar or block completion) rather
-      // than the whole category's lifetime generated count.
+      // than the whole category's lifetime generated count. generatedCount/
+      // errorCount are tallied the same way, scoped to this run, so the UI can
+      // show "N generated, M error" for the batch currently in progress.
       attemptedCount++;
       const progress = Math.min(100, Math.floor((attemptedCount / pendingItems.length) * 100));
       await prisma.job.update({
         where: { id: jobId },
-        data: { progress }
+        data: {
+          progress,
+          ...(succeeded ? { generatedCount: { increment: 1 } } : { errorCount: { increment: 1 } })
+        }
       });
 
       // Wait to avoid rate limits

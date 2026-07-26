@@ -94,15 +94,25 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const jobId = searchParams.get('jobId');
 
-  if (!jobId) {
-    return NextResponse.json({ error: 'jobId required' }, { status: 400 });
-  }
-
   try {
-    const job = await prisma.job.findUnique({
-      where: { id: Number(jobId) }
+    if (jobId) {
+      const job = await prisma.job.findUnique({
+        where: { id: Number(jobId) }
+      });
+      return NextResponse.json(job);
+    }
+
+    // No jobId: the page calls this on load to reattach to whatever's still
+    // running/paused server-side. The BullMQ worker processes a job
+    // independently of any frontend polling it, so navigating away (or
+    // closing the browser entirely) never stops generation - only the local
+    // React state tracking it gets lost, which used to make the UI show the
+    // "Start Generation" button again even while rows kept generating.
+    const activeJob = await prisma.job.findFirst({
+      where: { status: { in: ['running', 'paused'] } },
+      orderBy: { id: 'desc' }
     });
-    return NextResponse.json(job);
+    return NextResponse.json(activeJob);
   } catch (err) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

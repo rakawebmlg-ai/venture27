@@ -88,11 +88,13 @@ model PromptTemplate {
 }
 
 model Job {
-  id           Int      @id @default(autoincrement())
-  status       String   @default("running") // running, paused, stopped, completed
-  progress     Int      @default(0)
-  totalItems   Int      @default(0)
-  errorLogs    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  status         String   @default("running") // running, paused, stopped, completed
+  progress       Int      @default(0)
+  totalItems     Int      @default(0)
+  generatedCount Int      @default(0)
+  errorCount     Int      @default(0)
+  errorLogs      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
