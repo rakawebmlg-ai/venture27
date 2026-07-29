@@ -49,32 +49,71 @@ export async function generateMetadata({ params }) {
   };
 }
 
-// Nav items and footer link columns mirror the approved Figma design's
-// chrome (same on every generated page), but none of these destinations
-// exist yet in this app (there's no public marketing site, just this one
-// page type) - per explicit decision, they render visually but stay inert
-// (href="#") until real pages exist, rather than link into the internal
-// admin dashboard or 404.
-const NAV_ITEMS = ['Home', 'Services', 'Our Approach', 'Why Choose Us', 'Recent work', 'Contact'];
+// Nav items and footer link columns mirror the real venture27.com site
+// (this pSEO tool has no public marketing site of its own - these
+// programmatic pages are meant to sit alongside/link back into it), so
+// they're real links to venture27.com, opened in a new tab since it's a
+// different site entirely. Hrefs/labels copied directly from the live
+// site's markup (2026-07) rather than guessed - e.g. the footer's Legal
+// column really is just 2 items ("Privacy Policy"/"Terms Of Service", no
+// Blog), and the top nav has no "Contact" item.
+const SITE_URL = 'https://www.venture27.com';
 
+const NAV_ITEMS = [
+  { label: 'Home', href: `${SITE_URL}/` },
+  { label: 'Services', href: `${SITE_URL}/services` },
+  { label: 'Our Approach', href: `${SITE_URL}/detail` },
+  { label: 'Why Choose Us', href: `${SITE_URL}/about` },
+  { label: 'Recent work', href: `${SITE_URL}/#Recent-work` },
+];
+
+// Titles are cased exactly as authored on the real site, not force-uppercased
+// - "SERVICES" really is all-caps in their source, but "Venture27"/"Legal"
+// are plain title-case there (a previous version of this page forced all
+// three through .toUpperCase(), which wrongly rendered "VENTURE27"/"LEGAL").
 const FOOTER_COLUMNS = [
   {
-    title: 'Services',
+    title: 'SERVICES',
     links: [
-      'Interface Design', 'Mobile App Development', 'Web Application Development',
-      'Custom Software Development', 'Digital Product Engineering', 'Digital Marketing',
-      'Search Engine Optimization', 'Websites That Convert', 'Digital Commerce',
-      'Digital Transformation', 'Cloud & DevOps', 'Artificial Intelligence',
-      'Cybersecurity', 'ERP Systems', 'CRM Systems',
-    ],
+      ['Interface Design', '/interface-design'],
+      ['Mobile App Development', '/mobile-app-development'],
+      ['Web Application Development', '/web-application-development'],
+      ['Custom Software Development', '/custom-software-development'],
+      ['Digital Product Engineering', '/digital-product-engineering'],
+      ['Digital Marketing', '/digital-marketing'],
+      ['Search Engine Optimization', '/search-engine-optimization'],
+      ['Websites That Convert', '/websites-that-convert'],
+      ['Digital Commerce', '/digital-commerce'],
+      ['Digital Transformation', '/digital-transformation'],
+      ['Cloud & DevOps', '/cloud-devops'],
+      ['Artificial Intelligence', '/artificial-intelligence'],
+      ['Cybersecurity', '/cybersecurity'],
+      ['ERP Systems', '/erp'],
+      ['CRM Systems', '/crm-systems'],
+    ].map(([label, path]) => ({ label, href: `${SITE_URL}${path}` })),
   },
   {
     title: 'Venture27',
-    links: ['About', 'Contact', 'Request A Call', 'Request Estimate'],
+    links: [
+      { label: 'About', href: `${SITE_URL}/about` },
+      { label: 'Contact', href: `${SITE_URL}/contact` },
+      { label: 'Request A Call', href: 'https://calendly.com/venture27/discovery-call?month=2025-09' },
+      { label: 'Request Estimate', href: `${SITE_URL}/` },
+    ],
   },
   {
     title: 'Legal',
-    links: ['Blog', 'Privacy and Policy', 'Terms and Conditions'],
+    links: [
+      // The real site's own footer links to /Privacy-and-Policy and
+      // /Terms-and-Conditions, but both 404 there (confirmed live) - its
+      // sitemap.xml only lists /privacy-policy as a real page, so that's
+      // used here instead of literally reproducing a dead link. No working
+      // Terms page exists anywhere on the real site as of this writing, so
+      // Terms still points at their (currently broken) URL - nothing better
+      // to link to.
+      { label: 'Privacy Policy', href: `${SITE_URL}/privacy-policy` },
+      { label: 'Terms Of Service', href: `${SITE_URL}/Terms-and-Conditions` },
+    ],
   },
 ];
 
@@ -116,18 +155,15 @@ export default async function ProgrammaticPage({ params }) {
         <div className="ppage-navbar-inner">
           <img src="/venture27-logo.png" alt="Venture27" className="ppage-logo" />
           <div className="ppage-nav-links">
-            {NAV_ITEMS.map((label) => (
-              <span
-                key={label}
-                className={`ppage-nav-link ${label === 'Services' ? 'is-active' : ''}`}
-              >
-                {label}
-              </span>
+            {NAV_ITEMS.map((item) => (
+              <a key={item.label} href={item.href} target="_blank" rel="noopener noreferrer" className="ppage-nav-link">
+                {item.label}
+              </a>
             ))}
           </div>
-          <span className="ppage-cta-button">
-            Request an Estimate
-          </span>
+          <a href={`${SITE_URL}/`} target="_blank" rel="noopener noreferrer" className="ppage-cta-button">
+            Request An Estimate
+          </a>
         </div>
       </nav>
 
@@ -214,11 +250,11 @@ export default async function ProgrammaticPage({ params }) {
           </div>
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.title} className="ppage-footer-col">
-              <div className="ppage-footer-title">{col.title.toUpperCase()}</div>
-              {col.links.map((label) => (
-                <span key={label} className="ppage-footer-link">
-                  {label}
-                </span>
+              <div className="ppage-footer-title">{col.title}</div>
+              {col.links.map((link) => (
+                <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" className="ppage-footer-link">
+                  {link.label}
+                </a>
               ))}
             </div>
           ))}
@@ -226,16 +262,52 @@ export default async function ProgrammaticPage({ params }) {
       </footer>
 
       <style dangerouslySetInnerHTML={{ __html: `
+        @property --ppage-angle { syntax: '<angle>'; initial-value: 20deg; inherits: false; }
+        @property --ppage-c1 { syntax: '<color>'; initial-value: transparent; inherits: false; }
+        @property --ppage-c2 { syntax: '<color>'; initial-value: transparent; inherits: false; }
+
         .ppage { min-height: 100vh; background: #090A0E; color: #FFFFFF; font-family: var(--font-inter), Inter, sans-serif; }
 
-        /* Navbar */
+        /* Navbar - hover/CTA styling mirrors the real site's animated
+           gradient-border technique exactly (verified from its actual
+           embedded <style> block): a 3-layer background (tint + black
+           overlay + an angle/color-animated border gradient using
+           @property so the custom properties transition smoothly instead
+           of snapping), not a JS-driven effect. */
         .ppage-navbar { position: sticky; top: 0; z-index: 10; background: rgba(0,0,0,0.05); backdrop-filter: blur(50px); border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%) 1; }
         .ppage-navbar-inner { max-width: 1512px; margin: 0 auto; padding: 14px 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
         .ppage-logo { width: 235px; height: 38px; display: block; }
-        .ppage-nav-links { display: flex; align-items: center; gap: 8px; }
-        .ppage-nav-link { padding: 8px 16px; border-radius: 999px; font-size: 14px; color: #99A1AF; text-decoration: none; white-space: nowrap; cursor: default; }
-        .ppage-nav-link.is-active { background: rgba(255,255,255,0.05); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.1); }
-        .ppage-cta-button { flex-shrink: 0; padding: 14px; border-radius: 10px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.15); color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; text-align: center; cursor: default; }
+        .ppage-nav-links { display: flex; align-items: center; }
+        .ppage-nav-link {
+          --ppage-angle: 20deg; --ppage-c1: transparent; --ppage-c2: transparent;
+          margin: 0 17px; padding: 10px 16px; border-radius: 10px; font-size: 16px; font-weight: 400;
+          color: #99A1AF; text-decoration: none; white-space: nowrap;
+          background-color: transparent; border: 1px solid transparent;
+          transition: --ppage-angle .6s ease-out, --ppage-c1 .6s ease-out, color .15s;
+        }
+        .ppage-nav-link:hover {
+          --ppage-c1: #ffffff40; --ppage-angle: 90deg;
+          color: #FFFFFF;
+          background-image: linear-gradient(#FFFFFF0D), linear-gradient(#000000), linear-gradient(var(--ppage-angle), var(--ppage-c1), transparent);
+          background-clip: padding-box, padding-box, border-box;
+          background-origin: border-box, border-box, border-box;
+        }
+        .ppage-cta-button {
+          --ppage-angle: 20deg; --ppage-c1: #ffffff26; --ppage-c2: #ffffff26;
+          flex-shrink: 0; padding: 14px; border-radius: 10px;
+          background-color: transparent; border: 1px solid transparent;
+          color: #FFFFFF; font-size: 16px; font-weight: 500; text-decoration: none; text-align: center;
+          background-image: linear-gradient(#FFFFFF03), linear-gradient(#000000BF), linear-gradient(var(--ppage-angle), var(--ppage-c1), transparent, var(--ppage-c2));
+          background-clip: padding-box, padding-box, border-box;
+          background-origin: border-box, border-box, border-box;
+          transition: --ppage-angle .6s ease-out, --ppage-c1 .6s ease-out, --ppage-c2 .6s ease-out, box-shadow .3s ease-out, transform .3s ease-out;
+        }
+        .ppage-cta-button:hover {
+          --ppage-angle: 160deg; --ppage-c1: #ffffff61; --ppage-c2: #ffffff61;
+          color: #FFFFFF;
+          transform: translateY(-1px);
+          box-shadow: 0 8px 24px rgba(255,255,255,.25);
+        }
 
         /* Main */
         .ppage-main { max-width: 1400px; margin: 0 auto; padding: 48px 24px 80px; display: flex; align-items: flex-start; gap: 24px; }
@@ -283,10 +355,11 @@ export default async function ProgrammaticPage({ params }) {
 
         /* Footer */
         .ppage-footer { border-top: 1px solid transparent; border-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 100%) 1; margin-top: 40px; }
-        .ppage-footer-inner { max-width: 1512px; margin: 0 auto; padding: 48px 24px; display: flex; flex-wrap: wrap; gap: 28px; }
+        .ppage-footer-inner { max-width: 1512px; margin: 0 auto; padding: 48px; display: flex; flex-wrap: wrap; gap: 28px; }
         .ppage-footer-col { flex: 1 1 200px; display: flex; flex-direction: column; gap: 14px; }
         .ppage-footer-title { font-size: 14px; font-weight: 600; color: #FFFFFF; }
-        .ppage-footer-link { font-size: 14px; color: #99A1AF; text-decoration: none; cursor: default; }
+        .ppage-footer-link { font-size: 14px; color: #99A1AF; text-decoration: none; transition: color 0.3s ease-in; }
+        .ppage-footer-link:hover { color: #FFFFFF; }
         .ppage-footer-company { flex: 0 0 340px; max-width: 340px; margin-right: 114px; }
         .ppage-footer-logo { width: 173px; height: 28px; align-self: flex-start; margin-bottom: 4px; }
         .ppage-footer-about { font-size: 14px; line-height: 1.45; color: #99A1AF; margin: 0; }
