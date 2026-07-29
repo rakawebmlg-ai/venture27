@@ -20,7 +20,7 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   echo "host all all 127.0.0.1/32 scram-sha-256" >> "$PGDATA/pg_hba.conf"
 fi
 
-gosu postgres "$PG_BIN/pg_ctl" -D "$PGDATA" -l /var/log/postgres.log -w start
+gosu postgres "$PG_BIN/pg_ctl" -D "$PGDATA" -l /var/lib/postgresql/postgres.log -w start
 
 gosu postgres psql -v ON_ERROR_STOP=1 --username postgres -c \
   "ALTER ROLE postgres WITH PASSWORD '${POSTGRES_PASSWORD}';"
