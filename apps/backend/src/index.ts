@@ -206,10 +206,13 @@ const worker = new Worker<GenerationJobPayload>(
 async function runGeneration(jobId: number, categoryId: number, promptTemplate: string, limit: number | undefined, aiProvider: any) {
     // Fetch pending combinations for this category, capped at `limit` so a run
     // only processes the next N rows and leaves the rest 'pending' for a later run.
+    // orderBy must match /api/master-data's own `id: 'desc'` (newest at the
+    // top of the Master Data / Content Preview tables) - otherwise the row
+    // shown at the top of the list is actually the last one generated.
     const pendingItems = await prisma.masterData.findMany({
       where: { categoryId, status: 'pending' },
       include: { location: true, service: true, category: true },
-      orderBy: { id: 'asc' },
+      orderBy: { id: 'desc' },
       ...(limit ? { take: limit } : {})
     });
 

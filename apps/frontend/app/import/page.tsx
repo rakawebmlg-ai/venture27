@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { combineLocationName } from '../lib/location';
+import PaginationRow, { paginate, clampPage, PAGE_SIZE } from '../components/Pagination';
 
 export default function ImportPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [groupPages, setGroupPages] = useState<Record<string, number>>({});
   const [importingId, setImportingId] = useState<number | null>(null);
   const [importingCategory, setImportingCategory] = useState<string | null>(null);
   const [importingAll, setImportingAll] = useState(false);
@@ -156,6 +158,9 @@ export default function ImportPage() {
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName];
+                const currentPage = clampPage(groupPages[groupName] || 1, items.length);
+                const pagedItems = paginate(items, currentPage);
+                const pageOffset = (currentPage - 1) * PAGE_SIZE;
                 return (
                   <tbody key={groupName}>
                     <tr
@@ -188,9 +193,9 @@ export default function ImportPage() {
                       </td>
                     </tr>
 
-                    {isExpanded && items.map((item, idx) => (
+                    {isExpanded && pagedItems.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
-                        <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
+                        <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{pageOffset + idx + 1}</td>
                         <td>{item.location?.city || '-'}</td>
                         <td>{item.location?.community || '-'}</td>
                         <td>{item.location?.county || '-'}</td>
@@ -212,6 +217,14 @@ export default function ImportPage() {
                         </td>
                       </tr>
                     ))}
+                    {isExpanded && (
+                      <PaginationRow
+                        page={currentPage}
+                        totalItems={items.length}
+                        colSpan={9}
+                        onPageChange={(p) => setGroupPages(prev => ({ ...prev, [groupName]: p }))}
+                      />
+                    )}
                   </tbody>
                 );
               })

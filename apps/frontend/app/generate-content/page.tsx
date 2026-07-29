@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { combineLocationName } from '../lib/location';
+import PaginationRow, { paginate, clampPage, PAGE_SIZE } from '../components/Pagination';
 
 export default function GenerateContentPage() {
   const [jobId, setJobId] = useState<number | null>(null);
@@ -30,6 +31,7 @@ export default function GenerateContentPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [groupPages, setGroupPages] = useState<Record<string, number>>({});
   const [previewItem, setPreviewItem] = useState<any | null>(null);
   const [resettingId, setResettingId] = useState<number | null>(null);
   const [resettingGroup, setResettingGroup] = useState<string | null>(null);
@@ -43,16 +45,22 @@ export default function GenerateContentPage() {
     loadDefaultSettings();
   }, []);
 
-  // Prompt/model/notify-email/enableSmtp used to live only in React state,
-  // so a page refresh silently wiped them - an earlier attempt persisted
-  // them to localStorage automatically on every change, but that wasn't
-  // reliable enough in practice, so this now saves to the DB (the same
-  // `Settings` singleton row used elsewhere in the app) only when the user
-  // explicitly clicks "Save Settings", matching the existing Settings page's
-  // own explicit-Save convention rather than silent auto-persist. Loaded
-  // back on mount. Deliberately excludes `limit` (a per-run batch size, not
-  // a standing preference) and `selectedCategoryId` (already has its own
-  // "pick the first category with pending work" default).
+  // Prompt/model/notify-email/enableSmtp/category used to live only in React
+  // state, so a page refresh silently wiped them - an earlier attempt
+  // persisted them to localStorage automatically on every change, but that
+  // wasn't reliable enough in practice, so this now saves to the DB (the
+  // same `Settings` singleton row used elsewhere in the app) only when the
+  // user explicitly clicks "Save Settings", matching the existing Settings
+  // page's own explicit-Save convention rather than silent auto-persist.
+  // Loaded back on mount. Deliberately excludes `limit` (a per-run batch
+  // size, not a standing preference).
+  //
+  // `defaultCategoryId` is set unconditionally (not guarded by "only if
+  // still empty") because it can race with the auto-select effect below
+  // (`categoryOptions` picks the first category with pending work as soon
+  // as `data` loads, which may resolve before this fetch does) - whichever
+  // one runs last must win, and the explicitly-saved preference should
+  // always take priority over the pending-work fallback once it arrives.
   const loadDefaultSettings = async () => {
     try {
       const res = await fetch('/api/settings');
@@ -62,6 +70,7 @@ export default function GenerateContentPage() {
       if (typeof settings.defaultAiModel === 'string' && settings.defaultAiModel) setAiModel(settings.defaultAiModel);
       if (typeof settings.defaultEnableSmtp === 'boolean') setEnableSmtp(settings.defaultEnableSmtp);
       if (typeof settings.defaultNotifyEmail === 'string' && settings.defaultNotifyEmail) setNotifyEmail(settings.defaultNotifyEmail);
+      if (typeof settings.defaultCategoryId === 'number') setSelectedCategoryId(settings.defaultCategoryId);
     } catch (e) {
       console.error(e);
     }
@@ -78,6 +87,7 @@ export default function GenerateContentPage() {
           defaultAiModel: aiModel,
           defaultEnableSmtp: enableSmtp,
           defaultNotifyEmail: notifyEmail,
+          defaultCategoryId: selectedCategoryId === '' ? null : selectedCategoryId,
         })
       });
       setDefaultsSaved(true);
@@ -723,10 +733,13 @@ export default function GenerateContentPage() {
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName];
+                const currentPage = clampPage(groupPages[groupName] || 1, items.length);
+                const pagedItems = paginate(items, currentPage);
+                const pageOffset = (currentPage - 1) * PAGE_SIZE;
                 return (
                   <tbody key={groupName}>
-                    <tr 
-                      className="group-header-row" 
+                    <tr
+                      className="group-header-row"
                       onClick={() => toggleGroup(groupName)}
                       style={{ cursor: 'pointer', background: 'var(--color-bg-secondary)', transition: 'background 0.2s' }}
                     >
@@ -769,9 +782,9 @@ export default function GenerateContentPage() {
                       </td>
                     </tr>
                     
-                    {isExpanded && items.map((item, idx) => (
+                    {isExpanded && pagedItems.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
-                        <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
+                        <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{pageOffset + idx + 1}</td>
                         <td>{item.location?.city || '-'}</td>
                         <td>{item.location?.community || '-'}</td>
                         <td>{item.location?.county || '-'}</td>
@@ -813,6 +826,14 @@ export default function GenerateContentPage() {
                         </td>
                       </tr>
                     ))}
+                    {isExpanded && (
+                      <PaginationRow
+                        page={currentPage}
+                        totalItems={items.length}
+                        colSpan={11}
+                        onPageChange={(p) => setGroupPages(prev => ({ ...prev, [groupName]: p }))}
+                      />
+                    )}
                   </tbody>
                 );
               })

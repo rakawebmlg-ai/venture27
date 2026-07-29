@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { buildSlug } from '../lib/slug';
 import { primaryLocationType, combineLocationName, LocationType } from '../lib/location';
 import { renderPlaceholders } from '../lib/placeholders';
+import PaginationRow, { paginate, clampPage, PAGE_SIZE } from './Pagination';
 
 // Rows published before the slug column existed (or that hit a naming
 // collision) may not have a stored one yet - fall back to computing it on
@@ -26,6 +27,7 @@ export default function ServiceListPage({ field }: { field: LocationType }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState<string>('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [groupPages, setGroupPages] = useState<Record<string, number>>({});
   const [unpublishingId, setUnpublishingId] = useState<number | null>(null);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
 
@@ -186,6 +188,9 @@ export default function ServiceListPage({ field }: { field: LocationType }) {
             ) : Object.keys(groupedData).length > 0 ? (
               Object.entries(groupedData).map(([groupName, items]) => {
                 const isExpanded = expandedGroups[groupName] ?? true;
+                const currentPage = clampPage(groupPages[groupName] || 1, items.length);
+                const pagedItems = paginate(items, currentPage);
+                const pageOffset = (currentPage - 1) * PAGE_SIZE;
                 return (
                   <tbody key={groupName}>
                     <tr
@@ -217,9 +222,9 @@ export default function ServiceListPage({ field }: { field: LocationType }) {
                       </td>
                     </tr>
 
-                    {isExpanded && items.map((item, idx) => (
+                    {isExpanded && pagedItems.map((item, idx) => (
                       <tr key={item.id} style={{ background: 'var(--color-bg-primary)' }}>
-                        <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{idx + 1}</td>
+                        <td style={{ color: 'var(--color-text-muted)', paddingLeft: '40px' }}>{pageOffset + idx + 1}</td>
                         <td>{item.location?.city || '-'}</td>
                         <td>{item.location?.community || '-'}</td>
                         <td>{item.location?.county || '-'}</td>
@@ -249,6 +254,14 @@ export default function ServiceListPage({ field }: { field: LocationType }) {
                         </td>
                       </tr>
                     ))}
+                    {isExpanded && (
+                      <PaginationRow
+                        page={currentPage}
+                        totalItems={items.length}
+                        colSpan={9}
+                        onPageChange={(p) => setGroupPages(prev => ({ ...prev, [groupName]: p }))}
+                      />
+                    )}
                   </tbody>
                 );
               })

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { paginate, PaginationBar } from '../components/Pagination';
 
 const STATUS_BADGE: Record<string, string> = {
   completed: 'success',
@@ -20,6 +21,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [expandedJob, setExpandedJob] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     fetchJobs();
@@ -39,6 +41,12 @@ export default function HistoryPage() {
 
   const statusOptions = ['all', ...Array.from(new Set(jobs.map((j) => j.status)))];
   const filteredJobs = filterStatus === 'all' ? jobs : jobs.filter((j) => j.status === filterStatus);
+  const pagedJobs = paginate(filteredJobs, page);
+
+  const selectStatus = (status: string) => {
+    setFilterStatus(status);
+    setPage(1);
+  };
 
   return (
     <>
@@ -54,7 +62,7 @@ export default function HistoryPage() {
               <button
                 key={status}
                 className={`tab-item ${filterStatus === status ? 'active' : ''}`}
-                onClick={() => setFilterStatus(status)}
+                onClick={() => selectStatus(status)}
               >
                 {status === 'all' ? 'All Jobs' : status.charAt(0).toUpperCase() + status.slice(1)}
                 <span style={{ marginLeft: '4px', fontSize: '11px', opacity: 0.6 }}>
@@ -78,7 +86,7 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {filteredJobs.map((job) => {
+          {pagedJobs.map((job) => {
             const isTerminal = ['completed', 'failed', 'stopped'].includes(job.status);
             const pct = job.progress ?? 0;
             return (
@@ -180,6 +188,9 @@ export default function HistoryPage() {
               </div>
             );
           })}
+          <div className="card">
+            <PaginationBar page={page} totalItems={filteredJobs.length} onPageChange={setPage} />
+          </div>
         </div>
       )}
     </>
