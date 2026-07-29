@@ -19,10 +19,6 @@ Current Workaround: Before restarting the backend during development, check `SEL
 Recommended Next Action: Guard the reset with `Job.status !== 'stopped'` (and probably `!== 'paused'`) before overwriting it to `'running'`, so only jobs that were genuinely still `running` at kill-time auto-resume.
 
 ## Issue: SMTP Emails Not Actually Sent
-Status: Open
-Description: The UI allows the user to check "Enable Email Report" and configure SMTP in settings, but the BullMQ worker does not actually dispatch an email yet.
-Impact: Users do not receive completion notifications.
-Evidence: `apps/backend/src/index.ts` completes the job but lacks `nodemailer` or equivalent email dispatch code.
-Possible Cause: Feature pending implementation.
-Current Workaround: Monitor dashboard UI for completion.
-Recommended Next Action: Implement `nodemailer` in the BullMQ worker completion block.
+Status: Resolved 2026-07-28
+Description: The UI allowed checking "Enable Email Report" and configuring SMTP in Settings, but the BullMQ worker never actually dispatched an email.
+Resolution: Implemented for real - `Job.notifyEmail` (new schema field, set per-run via a "Notify Email" input on Generate Content, only shown once "Enable Email Report" is checked) + `nodemailer` in `apps/backend/src/index.ts` (`sendJobResultEmail()`), wired into both the job-completion and setup-failure paths. Sends a plain-text summary: category, total items, generated count, error count (and the failure reason, if applicable). Verified against the real SMTP credentials already configured in this environment (`mail.smtp2go.com`) using a safe non-deliverable test recipient (`test@example.com`, RFC 2606-reserved) - confirmed a real connection + real (expected) rejection, proving the transport/trigger/error-handling all work without risking an unwanted real send. See CURRENT_STATE.md item -22 for full detail.

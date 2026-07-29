@@ -49,7 +49,7 @@ Venture 27 is a Programmatic SEO (pSEO) Dashboard system designed to generate la
 - Shared Prisma Client exported to both frontend and backend.
 
 ## Authentication
-- Currently UNKNOWN / NEEDS CONFIRMATION (Looks like a local tool with no explicit login implemented yet).
+- Single shared dashboard password, gated via `proxy.ts` (Next.js 16's rename of Middleware) + a signed session cookie (`jose`, HS256). No per-user accounts - this is a single-operator internal tool, matching every other single-tenant assumption already in this codebase (the `Settings` singleton, no user/role model anywhere in the schema). `DASHBOARD_PASSWORD` and `SESSION_SECRET` env vars are required in production - see docs/ai-context/CURRENT_STATE.md for the item that added this. Public programmatic pages and SEO files (robots.txt, sitemaps) are deliberately excluded from the gate.
 
 ## Third-Party Services
 - OpenAI (GPT-4o)
