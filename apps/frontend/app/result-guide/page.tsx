@@ -1,6 +1,6 @@
 import { prisma } from '@venture27/database';
 import { headers } from 'next/headers';
-import { getSitemapChunks } from '../lib/sitemap';
+import { getSitemapChunks } from '../lib/sitemapData';
 import { renderPlaceholders } from '../lib/placeholders';
 import { combineLocationName } from '../lib/location';
 

@@ -1,4 +1,4 @@
-import { getSitemapChunks, getBaseUrl } from '../lib/sitemap';
+import { getSitemapChunks, getBaseUrl } from '../lib/sitemapData';
 
 export async function GET(req: Request) {
   const baseUrl = getBaseUrl(req);

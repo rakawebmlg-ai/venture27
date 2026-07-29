@@ -1,4 +1,4 @@
-import { getSitemapChunks, getBaseUrl } from '../../lib/sitemap';
+import { getSitemapChunks, getBaseUrl } from '../../lib/sitemapData';
 
 // Serves one chunk file, e.g. /sitemaps/city-1-10000.xml - filenames are
 // computed by getSitemapChunks() (10,000 URLs max per file, named
