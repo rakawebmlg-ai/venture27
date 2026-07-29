@@ -1,15 +1,54 @@
-export default function ResultGuidePage() {
+import { prisma } from '@venture27/database';
+import { headers } from 'next/headers';
+import { getSitemapChunks } from '../lib/sitemap';
+import { renderPlaceholders } from '../lib/placeholders';
+import { combineLocationName } from '../lib/location';
+
+export default async function ResultGuidePage() {
+  const headersList = await headers();
+  const host = headersList.get('host') || 'localhost:3000';
+  const proto = headersList.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+  const baseUrl = `${proto}://${host}`;
+
+  const [publishedCount, chunks, exampleRow] = await Promise.all([
+    prisma.masterData.count({ where: { published: true } }),
+    getSitemapChunks(),
+    prisma.masterData.findFirst({
+      where: { published: true, slug: { not: null } },
+      include: { location: true, service: true, category: true },
+      orderBy: { updatedAt: 'desc' }
+    })
+  ]);
+
+  const totalSitemapUrls = chunks.reduce((sum, c) => sum + c.urls.length, 0);
+
+  let exampleUrl: string | null = null;
+  let exampleJsonLd: Record<string, any> | null = null;
+  if (exampleRow) {
+    exampleUrl = `${baseUrl}${exampleRow.slug}`;
+    const locationLabel = combineLocationName(exampleRow.location.city, exampleRow.location.community, exampleRow.location.county);
+    const metaDescription = renderPlaceholders(exampleRow.service.metaDescription, exampleRow.location);
+    exampleJsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Service',
+      name: exampleRow.service.name,
+      ...(metaDescription ? { description: metaDescription } : {}),
+      areaServed: { '@type': 'Place', name: `${locationLabel}, ${exampleRow.location.province}` },
+      ...(exampleRow.category?.name ? { category: exampleRow.category.name } : {}),
+    };
+  }
+
   return (
     <>
       <div className="page-title-section">
         <h1 className="page-title">Result Guide</h1>
-        <p className="page-subtitle">How to use the generated pages on your Marketing Site</p>
+        <p className="page-subtitle">How the public programmatic pages, sitemap, and robots.txt actually work in this app</p>
       </div>
 
-      {/* Completion Banner */}
+      {/* Live Status Banner */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(34, 197, 94, 0.05))',
-        border: '1px solid rgba(59, 130, 246, 0.2)',
+        background: 'linear-gradient(135deg, rgba(91, 235, 205, 0.1), rgba(34, 197, 94, 0.05))',
+        border: '1px solid rgba(91, 235, 205, 0.2)',
         borderRadius: 'var(--radius-lg)',
         padding: '24px',
         display: 'flex',
@@ -27,13 +66,13 @@ export default function ResultGuidePage() {
           justifyContent: 'center',
           fontSize: '24px',
           flexShrink: 0,
-        }}>✅</div>
+        }}>{publishedCount > 0 ? '✅' : 'ℹ️'}</div>
         <div>
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            Last Generation Completed Successfully
+            {publishedCount > 0 ? 'Public pages are live' : 'No pages published yet'}
           </div>
           <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-            156,240 pages generated across 5 services • 16 sitemap files created • Completed July 20, 2026
+            {publishedCount} page{publishedCount === 1 ? '' : 's'} published • {chunks.length} sitemap file{chunks.length === 1 ? '' : 's'} • {totalSitemapUrls} URL{totalSitemapUrls === 1 ? '' : 's'} in the sitemap right now
           </div>
         </div>
       </div>
@@ -49,7 +88,7 @@ export default function ResultGuidePage() {
           </div>
           <div className="card-body" style={{ lineHeight: 1.8 }}>
             <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-              Each generated page has a unique URL following this pattern:
+              Each published page's URL is built from whichever location field (City, Community, or County) is the most specific one set on that row - that field becomes <code style={{ fontFamily: 'var(--font-mono)' }}>{'{type}'}</code>:
             </p>
             <div style={{
               background: 'var(--color-bg-primary)',
@@ -61,126 +100,104 @@ export default function ResultGuidePage() {
               color: 'var(--color-blue-300)',
               lineHeight: 2,
             }}>
-              <div><span style={{ color: 'var(--color-text-muted)' }}>// Service + Province</span></div>
-              <div>https://service.venture27.com/<span style={{ color: 'var(--color-blue-400)' }}>{'{service}'}</span>/<span style={{ color: 'var(--color-success)' }}>{'{province}'}</span></div>
-              <br />
-              <div><span style={{ color: 'var(--color-text-muted)' }}>// Service + Province + City</span></div>
-              <div>https://service.venture27.com/<span style={{ color: 'var(--color-blue-400)' }}>{'{service}'}</span>/<span style={{ color: 'var(--color-success)' }}>{'{province}'}</span>/<span style={{ color: 'var(--color-warning)' }}>{'{city}'}</span></div>
-              <br />
-              <div><span style={{ color: 'var(--color-text-muted)' }}>// Full path with all levels</span></div>
-              <div>https://service.venture27.com/<span style={{ color: 'var(--color-blue-400)' }}>{'{service}'}</span>/<span style={{ color: 'var(--color-success)' }}>{'{province}'}</span>/<span style={{ color: 'var(--color-warning)' }}>{'{city}'}</span>/<span style={{ color: '#a855f7' }}>{'{county}'}</span>/<span style={{ color: 'var(--color-info)' }}>{'{community}'}</span></div>
+              <div>{baseUrl}/<span style={{ color: 'var(--color-blue-400)' }}>{'{type}'}</span>/services/<span style={{ color: 'var(--color-success)' }}>{'{value}'}</span>/<span style={{ color: 'var(--color-warning)' }}>{'{service}'}</span>/<span style={{ color: '#a855f7' }}>{'{heading}'}</span></div>
+              <div style={{ marginTop: '4px', color: 'var(--color-text-muted)', fontSize: '11px' }}>
+                type: city | community | county &middot; value: the location's slugified name &middot; service: the service name slug &middot; heading: the rendered page heading slug
+              </div>
             </div>
             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '12px' }}>
-              Example: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue-300)', background: 'rgba(91,235,205,0.08)', padding: '2px 6px', borderRadius: '3px' }}>
-                https://service.venture27.com/plumbing-services/jawa-barat/bandung/coblong/dago
-              </code>
+              {exampleUrl ? (
+                <>Live example: <a href={exampleUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-blue-300)', background: 'rgba(91,235,205,0.08)', padding: '2px 6px', borderRadius: '3px', textDecoration: 'none' }}>
+                {exampleUrl}
+              </a></>
+              ) : (
+                'No published pages yet - publish a row on the Service page to see a live example here.'
+              )}
             </p>
           </div>
         </div>
 
-        {/* Step 2: Page Data Structure */}
+        {/* Step 2: Page Data */}
         <div className="card">
           <div className="card-header">
             <span className="card-title">
               <span style={{ color: 'var(--color-blue-400)', marginRight: '8px' }}>02</span>
-              Page Data Structure
+              Structured Data (JSON-LD)
             </span>
           </div>
           <div className="card-body">
             <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-              Each generated page contains the following data fields:
+              Every published page embeds this <code style={{ fontFamily: 'var(--font-mono)' }}>schema.org/Service</code> block in a <code style={{ fontFamily: 'var(--font-mono)' }}>{'<script type="application/ld+json">'}</code> tag - only fields with real data are included, nothing is invented:
             </p>
-            <div style={{
-              background: 'var(--color-bg-primary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)',
-              padding: '16px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '12px',
-              color: 'var(--color-text-secondary)',
-              lineHeight: 1.8,
-            }}>
-              <div>{'{'}</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"title"</span>: <span style={{ color: 'var(--color-success)' }}>"Plumbing Services in Bandung, Jawa Barat"</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"slug"</span>: <span style={{ color: 'var(--color-success)' }}>"plumbing-services/jawa-barat/bandung"</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"keywords"</span>: <span style={{ color: 'var(--color-success)' }}>"plumbing, bandung, jawa barat, services"</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"content"</span>: <span style={{ color: 'var(--color-success)' }}>"&lt;h1&gt;Professional Plumbing...&lt;/h1&gt;..."</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"service_ref"</span>: <span style={{ color: 'var(--color-success)' }}>"plumbing-services"</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"location_ref"</span>: <span style={{ color: 'var(--color-success)' }}>"jawa-barat/bandung"</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"generated_at"</span>: <span style={{ color: 'var(--color-success)' }}>"2026-07-20T16:45:22Z"</span>,</div>
-              <div style={{ paddingLeft: '20px' }}><span style={{ color: 'var(--color-blue-300)' }}>"status"</span>: <span style={{ color: 'var(--color-success)' }}>"published"</span></div>
-              <div>{'}'}</div>
-            </div>
+            {exampleJsonLd ? (
+              <pre style={{
+                background: 'var(--color-bg-primary)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                padding: '16px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12px',
+                color: 'var(--color-success)',
+                lineHeight: 1.8,
+                overflowX: 'auto',
+                whiteSpace: 'pre',
+              }}>
+                {JSON.stringify(exampleJsonLd, null, 2)}
+              </pre>
+            ) : (
+              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>No published pages yet.</div>
+            )}
           </div>
         </div>
 
-        {/* Step 3: Sitemap & SEO */}
+        {/* Step 3: Sitemap & robots.txt */}
         <div className="card">
           <div className="card-header">
             <span className="card-title">
               <span style={{ color: 'var(--color-blue-400)', marginRight: '8px' }}>03</span>
-              Sitemap & SEO Files
+              Sitemap & robots.txt
             </span>
           </div>
           <div className="card-body" style={{ lineHeight: 1.8 }}>
             <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-              Sitemaps are automatically generated and chunked into files of max 10,000 URLs each.
+              <code style={{ fontFamily: 'var(--font-mono)' }}>/sitemap-index.xml</code> lists every chunk file below, generated on the fly from currently-published rows - chunked into groups of up to 10,000 URLs per <code style={{ fontFamily: 'var(--font-mono)' }}>{'{type}'}</code>. These are the chunks that exist right now:
             </p>
-            <div className="data-table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>File</th>
-                    <th>URLs</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>sitemap-index.xml</td>
-                    <td>—</td>
-                    <td><span className="badge badge-info">Index</span></td>
-                    <td><span className="badge badge-success"><span className="badge-dot"></span> Ready</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>state-1-10000.xml</td>
-                    <td>10,000</td>
-                    <td><span className="badge badge-neutral">Province</span></td>
-                    <td><span className="badge badge-success"><span className="badge-dot"></span> Ready</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>city-1-10000.xml</td>
-                    <td>10,000</td>
-                    <td><span className="badge badge-neutral">City</span></td>
-                    <td><span className="badge badge-success"><span className="badge-dot"></span> Ready</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>city-10001-20000.xml</td>
-                    <td>10,000</td>
-                    <td><span className="badge badge-neutral">City</span></td>
-                    <td><span className="badge badge-success"><span className="badge-dot"></span> Ready</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>county-1-10000.xml</td>
-                    <td>10,000</td>
-                    <td><span className="badge badge-neutral">County</span></td>
-                    <td><span className="badge badge-success"><span className="badge-dot"></span> Ready</span></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>robots.txt</td>
-                    <td>—</td>
-                    <td><span className="badge badge-info">Robots</span></td>
-                    <td><span className="badge badge-success"><span className="badge-dot"></span> Ready</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {chunks.length > 0 ? (
+              <div className="data-table-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>URLs</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>sitemap-index.xml</td>
+                      <td>—</td>
+                      <td><span className="badge badge-info">Index</span></td>
+                      <td><span className="badge badge-success"><span className="badge-dot"></span> Live</span></td>
+                    </tr>
+                    {chunks.map((c) => (
+                      <tr key={c.filename}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{c.filename}</td>
+                        <td>{c.urls.length}</td>
+                        <td><span className="badge badge-neutral">{c.type}</span></td>
+                        <td><span className="badge badge-success"><span className="badge-dot"></span> Live</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>No sitemap chunks yet - they appear once at least one page is published.</div>
+            )}
 
-            {/* robots.txt preview */}
             <div style={{ marginTop: '16px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                robots.txt preview
+                robots.txt (served live at {baseUrl}/robots.txt)
               </div>
               <div style={{
                 background: 'var(--color-bg-primary)',
@@ -193,9 +210,15 @@ export default function ResultGuidePage() {
                 lineHeight: 1.8,
               }}>
                 <div>User-agent: *</div>
-                <div>Allow: /</div>
-                <div style={{ marginTop: '8px' }}>Sitemap: https://service.venture27.com/sitemap-index.xml</div>
+                <div>Disallow: /</div>
+                <div>Allow: /city/</div>
+                <div>Allow: /community/</div>
+                <div>Allow: /county/</div>
+                <div style={{ marginTop: '8px' }}>Sitemap: {baseUrl}/sitemap-index.xml</div>
               </div>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
+                Everything is disallowed by default (this whole site is otherwise the internal admin dashboard), with only the public page prefixes explicitly allowed.
+              </p>
             </div>
           </div>
         </div>
@@ -205,19 +228,22 @@ export default function ResultGuidePage() {
           <div className="card-header">
             <span className="card-title">
               <span style={{ color: 'var(--color-blue-400)', marginRight: '8px' }}>04</span>
-              Next Steps
+              Deploying For Real
             </span>
           </div>
           <div className="card-body">
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
+              There's no separate "marketing site" or proxy to set up - this Next.js app serves the public pages directly.
+            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
-                { num: '1', text: 'Deploy the Marketing Site proxy to your server or CDN', icon: '🚀' },
-                { num: '2', text: 'Configure the proxy to fetch page data from the generation API', icon: '⚙️' },
-                { num: '3', text: 'Point your domain DNS to the Marketing Site', icon: '🌐' },
-                { num: '4', text: 'Submit sitemap-index.xml to Google Search Console', icon: '📤' },
-                { num: '5', text: 'Monitor search engine indexing and page performance', icon: '📊' },
-              ].map((step) => (
-                <div key={step.num} style={{
+                { text: <>Set a real <code style={{ fontFamily: 'var(--font-mono)' }}>SITE_URL</code> environment variable before deploying anywhere other than localhost - canonical/OG URLs and the sitemap currently resolve against {baseUrl}.</>, icon: '🌐' },
+                { text: 'Deploy this app (apps/frontend) to your hosting/CDN of choice - it serves both the admin dashboard and the public pages.', icon: '🚀' },
+                { text: 'Point your production domain\'s DNS at that deployment.', icon: '🔗' },
+                { text: `Submit ${baseUrl}/sitemap-index.xml to Google Search Console.`, icon: '📤' },
+                { text: 'Monitor indexing and search performance in Search Console.', icon: '📊' },
+              ].map((step, i) => (
+                <div key={i} style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '14px',
@@ -225,7 +251,6 @@ export default function ResultGuidePage() {
                   background: 'var(--color-bg-tertiary)',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--color-border)',
-                  transition: 'all 0.15s',
                 }}>
                   <span style={{ fontSize: '20px' }}>{step.icon}</span>
                   <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{step.text}</span>

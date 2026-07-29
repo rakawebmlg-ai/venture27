@@ -32,24 +32,3 @@ export const generatedMasterData = [
   { id: 2, city: 'Bekasi', province: 'Jawa Barat', service: 'Plumbing Services', title: 'Professional Plumbing in Bekasi, Jawa Barat', desc: 'Reliable plumbing services in Bekasi', heading: 'Expert Plumbers in Bekasi', subheading: '24/7 Service', content: '', image: '', status: 'pending', category: 'SEO' },
   { id: 3, city: 'Bandung', province: 'Jawa Barat', service: 'Electrical Repair', title: 'Trusted Electrical Repair in Bandung', desc: 'Safe electrical work across Jawa Barat', heading: 'Licensed Electricians in Bandung', subheading: 'Fast & Reliable', content: '<p>Generated content for Bandung...</p>', image: 'bandung-electric.jpg', status: 'generated', category: 'SEO' },
 ];
-
-export const generationJobs = [
-  {
-    id: 'gen-001',
-    status: 'completed',
-    started_at: '2026-07-20 14:30:00',
-    completed_at: '2026-07-20 16:45:22',
-    total_pages: 6168,
-    generated: 6168,
-    errors: 0,
-    services_count: 12,
-    locations_scope: 'All locations',
-    email_notification: true,
-    error_message: null as string | null,
-  }
-];
-
-export const generationLogs = [
-  { time: '14:30:00', level: 'info', message: 'Generation job started' },
-  { time: '14:30:01', level: 'info', message: 'Loading core services and locations...' },
-];
