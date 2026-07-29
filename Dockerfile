@@ -26,7 +26,11 @@ COPY package.json package-lock.json ./
 COPY apps/frontend/package.json apps/frontend/package.json
 COPY apps/backend/package.json apps/backend/package.json
 COPY packages/database/package.json packages/database/package.json
-RUN npm install
+# --ignore-scripts: the root "postinstall" script runs `prisma generate`,
+# but the actual schema file isn't copied in until after this layer - so at
+# this point that hook would run and immediately fail with "schema not
+# found". `prisma generate` is invoked explicitly below, after `COPY . .`.
+RUN npm install --ignore-scripts
 
 COPY . .
 
