@@ -13,6 +13,8 @@ export default function SettingsPage() {
     smtpEncryption: 'TLS',
     smtpUsername: '',
     smtpPassword: '',
+    smtpFromEmail: '',
+    smtpFromName: '',
     openaiKey: '',
     anthropicKey: '',
     geminiKey: ''
@@ -50,6 +52,8 @@ export default function SettingsPage() {
           smtpEncryption: settings.smtpEncryption,
           smtpUsername: settings.smtpUsername,
           smtpPassword: settings.smtpPassword,
+          smtpFromEmail: settings.smtpFromEmail,
+          smtpFromName: settings.smtpFromName,
         })
       });
       setSmtpSaved(true);
@@ -150,6 +154,19 @@ export default function SettingsPage() {
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label className="form-label">Password</label>
                 <input type="password" name="smtpPassword" className="form-input" placeholder="SMTP Password" value={settings.smtpPassword || ''} onChange={handleChange} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">From Email</label>
+                  <input type="email" name="smtpFromEmail" className="form-input" placeholder="notifications@yourdomain.com" value={settings.smtpFromEmail || ''} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">From Name (optional)</label>
+                  <input type="text" name="smtpFromName" className="form-input" placeholder="Venture27 Notifications" value={settings.smtpFromName || ''} onChange={handleChange} />
+                </div>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
+                Many providers (incl. SMTP2GO) use an account handle for "Username" that isn't itself a real email address - set the actual sender address here separately, or notification emails will be rejected.
               </div>
 
               <div style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>

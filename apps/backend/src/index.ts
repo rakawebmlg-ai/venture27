@@ -6,6 +6,7 @@ import { generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import nodemailer from 'nodemailer';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -43,6 +44,73 @@ function renderMetaField(text: string | null | undefined, city: string, province
 // filenames, instead of assuming city is always present.
 function primaryLocationName(city?: string | null, community?: string | null, county?: string | null): string {
   return community || city || county || 'location';
+}
+
+// Sends the "N generated / M error" result summary a user opted into via the
+// Notify Email field on Generate Content. Never throws - a broken SMTP
+// config or a failed send should show up in the backend log, not blow up
+// the generation job that already ran (successfully or not) by this point.
+async function sendJobResultEmail(params: {
+  to: string;
+  jobId: number;
+  status: 'completed' | 'failed';
+  categoryName?: string | null;
+  totalItems: number;
+  generatedCount: number;
+  errorCount: number;
+  errorLogs?: string | null;
+  settings: { smtpHost?: string | null; smtpPort?: string | null; smtpEncryption?: string | null; smtpUsername?: string | null; smtpPassword?: string | null; smtpFromEmail?: string | null; smtpFromName?: string | null };
+}) {
+  const { to, settings, jobId } = params;
+
+  if (!settings.smtpHost || !settings.smtpUsername || !settings.smtpPassword) {
+    console.log(`[Job ${jobId}] Skipping notification email to ${to} - SMTP is not configured in Settings.`);
+    return;
+  }
+
+  // smtpUsername is the SMTP *auth* login - many providers (SMTP2GO,
+  // Mailgun, etc.) issue an account handle here that isn't itself a
+  // deliverable email address, so it must never be reused as the "From"
+  // address (confirmed live: doing so got every send rejected with
+  // "550 ... blank sender"). smtpFromEmail is a separate, required field
+  // for exactly this reason - skip rather than guess if it's missing.
+  if (!settings.smtpFromEmail) {
+    console.log(`[Job ${jobId}] Skipping notification email to ${to} - "From Email" is not set in Settings (SMTP Username alone isn't a valid sender address for most providers).`);
+    return;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.smtpHost,
+      port: Number(settings.smtpPort) || 587,
+      // 'SSL' = implicit TLS (typically port 465); 'TLS' = STARTTLS on a
+      // plain connection (typically port 587); 'None' = unencrypted.
+      secure: settings.smtpEncryption === 'SSL',
+      ...(settings.smtpEncryption === 'TLS' ? { requireTLS: true } : {}),
+      auth: { user: settings.smtpUsername, pass: settings.smtpPassword },
+    });
+
+    const statusLabel = params.status === 'completed' ? 'Completed' : 'Failed';
+    const subject = `Venture27 - Content Generation Job #${jobId} ${statusLabel}${params.categoryName ? ` (${params.categoryName})` : ''}`;
+    const lines = [
+      `Job #${jobId} ${params.status === 'completed' ? 'finished running' : 'failed to start'}.`,
+      params.categoryName ? `Category: ${params.categoryName}` : null,
+      `Total items this run: ${params.totalItems}`,
+      `Generated: ${params.generatedCount}`,
+      `Errors: ${params.errorCount}`,
+      params.errorLogs ? `\nFailure reason: ${params.errorLogs}` : null,
+    ].filter((line): line is string => Boolean(line));
+
+    await transporter.sendMail({
+      from: settings.smtpFromName ? `"${settings.smtpFromName}" <${settings.smtpFromEmail}>` : settings.smtpFromEmail,
+      to,
+      subject,
+      text: lines.join('\n'),
+    });
+    console.log(`[Job ${jobId}] Notification email sent to ${to}`);
+  } catch (err) {
+    console.error(`[Job ${jobId}] Failed to send notification email to ${to}:`, err);
+  }
 }
 
 const MODEL_IDS: Record<string, string> = {
@@ -104,10 +172,31 @@ const worker = new Worker<GenerationJobPayload>(
       await runGeneration(jobId, categoryId, promptTemplate, limit, aiProvider);
     } catch (err: any) {
       console.error(`[Job ${job.id}] Setup failed for Database Job ID: ${jobId}:`, err);
-      await prisma.job.update({
+      const errorLogs = String(err?.message || err).slice(0, 1000);
+      const failedJob = await prisma.job.update({
         where: { id: jobId },
-        data: { status: 'failed', errorLogs: String(err?.message || err).slice(0, 1000) }
-      }).catch((updateErr: any) => console.error(`Also failed to record the failure on Job ${jobId}:`, updateErr));
+        data: { status: 'failed', errorLogs }
+      }).catch((updateErr: any) => {
+        console.error(`Also failed to record the failure on Job ${jobId}:`, updateErr);
+        return null;
+      });
+      if (failedJob?.notifyEmail) {
+        const category = await prisma.category.findUnique({ where: { id: categoryId } }).catch(() => null);
+        const emailSettings = await getSettings().catch(() => null);
+        if (emailSettings) {
+          await sendJobResultEmail({
+            to: failedJob.notifyEmail,
+            jobId,
+            status: 'failed',
+            categoryName: category?.name,
+            totalItems: failedJob.totalItems,
+            generatedCount: failedJob.generatedCount,
+            errorCount: failedJob.errorCount,
+            errorLogs,
+            settings: emailSettings,
+          });
+        }
+      }
       throw err;
     }
   },
@@ -256,6 +345,22 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
         data: { status: 'completed', progress: 100 }
       });
       console.log(`Job ${jobId} completed fully.`);
+
+      if (finalJob.notifyEmail) {
+        const emailSettings = await getSettings().catch(() => null);
+        if (emailSettings) {
+          await sendJobResultEmail({
+            to: finalJob.notifyEmail,
+            jobId,
+            status: 'completed',
+            categoryName: pendingItems[0]?.category?.name,
+            totalItems: finalJob.totalItems,
+            generatedCount: finalJob.generatedCount,
+            errorCount: finalJob.errorCount,
+            settings: emailSettings,
+          });
+        }
+      }
     }
 }
 

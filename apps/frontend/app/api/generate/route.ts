@@ -10,7 +10,7 @@ const generateQueue = new Queue('generate-content', { connection: redis });
 
 export async function POST(req: Request) {
   try {
-    const { action, categoryId, promptTemplate, aiModel, jobId, limit } = await req.json();
+    const { action, categoryId, promptTemplate, aiModel, jobId, limit, notifyEmail } = await req.json();
 
     if (action === 'start') {
       if (!categoryId || !promptTemplate || !aiModel) {
@@ -36,7 +36,8 @@ export async function POST(req: Request) {
         data: {
           totalItems,
           progress: 0,
-          status: 'running' // Initial status
+          status: 'running', // Initial status
+          notifyEmail: typeof notifyEmail === 'string' && notifyEmail.trim() ? notifyEmail.trim() : null
         }
       });
 

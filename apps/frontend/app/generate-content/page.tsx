@@ -12,7 +12,11 @@ export default function GenerateContentPage() {
   const [errorCount, setErrorCount] = useState(0);
   const [dragOverPrompt, setDragOverPrompt] = useState(false);
   const [aiModel, setAiModel] = useState('gpt-4o');
-  const [enableSmtp, setEnableSmtp] = useState(true);
+  // Defaults to off now that it actually sends a real email on completion -
+  // previously this checkbox was purely cosmetic (no recipient field, no
+  // backend wiring), so defaulting to "on" was harmless; now it isn't.
+  const [enableSmtp, setEnableSmtp] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState('');
   const [promptContent, setPromptContent] = useState('');
   const [limit, setLimit] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
@@ -20,6 +24,8 @@ export default function GenerateContentPage() {
   const [selectedPromptId, setSelectedPromptId] = useState<number | ''>('');
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [deletingPromptId, setDeletingPromptId] = useState<number | null>(null);
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [defaultsSaved, setDefaultsSaved] = useState(false);
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +40,55 @@ export default function GenerateContentPage() {
     fetchData();
     fetchPrompts();
     reattachActiveJob();
+    loadDefaultSettings();
   }, []);
+
+  // Prompt/model/notify-email/enableSmtp used to live only in React state,
+  // so a page refresh silently wiped them - an earlier attempt persisted
+  // them to localStorage automatically on every change, but that wasn't
+  // reliable enough in practice, so this now saves to the DB (the same
+  // `Settings` singleton row used elsewhere in the app) only when the user
+  // explicitly clicks "Save Settings", matching the existing Settings page's
+  // own explicit-Save convention rather than silent auto-persist. Loaded
+  // back on mount. Deliberately excludes `limit` (a per-run batch size, not
+  // a standing preference) and `selectedCategoryId` (already has its own
+  // "pick the first category with pending work" default).
+  const loadDefaultSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const settings = await res.json();
+      if (!settings) return;
+      if (typeof settings.defaultPromptTemplate === 'string' && settings.defaultPromptTemplate) setPromptContent(settings.defaultPromptTemplate);
+      if (typeof settings.defaultAiModel === 'string' && settings.defaultAiModel) setAiModel(settings.defaultAiModel);
+      if (typeof settings.defaultEnableSmtp === 'boolean') setEnableSmtp(settings.defaultEnableSmtp);
+      if (typeof settings.defaultNotifyEmail === 'string' && settings.defaultNotifyEmail) setNotifyEmail(settings.defaultNotifyEmail);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const saveDefaultSettings = async () => {
+    setSavingDefaults(true);
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          defaultPromptTemplate: promptContent,
+          defaultAiModel: aiModel,
+          defaultEnableSmtp: enableSmtp,
+          defaultNotifyEmail: notifyEmail,
+        })
+      });
+      setDefaultsSaved(true);
+      setTimeout(() => setDefaultsSaved(false), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save settings');
+    } finally {
+      setSavingDefaults(false);
+    }
+  };
 
   // Generation runs entirely in the backend BullMQ worker, independent of
   // this page - navigating away (or closing the browser) never stops it.
@@ -252,6 +306,11 @@ export default function GenerateContentPage() {
       return alert('Limit must be a positive number');
     }
 
+    const trimmedEmail = notifyEmail.trim();
+    if (enableSmtp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return alert('Enter a valid notify email, or uncheck "Enable Email Report"');
+    }
+
     const categoryId = selectedCategoryId;
 
     setIsGenerating(true);
@@ -269,7 +328,8 @@ export default function GenerateContentPage() {
           categoryId,
           promptTemplate: promptContent,
           aiModel,
-          limit: parsedLimit
+          limit: parsedLimit,
+          notifyEmail: enableSmtp ? trimmedEmail : undefined
         })
       });
       const job = await res.json();
@@ -472,8 +532,8 @@ export default function GenerateContentPage() {
                 <label className="form-label">SMTP Notifications</label>
                 <div style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={enableSmtp}
                       onChange={(e) => setEnableSmtp(e.target.checked)}
                       disabled={isGenerating && !isPaused}
@@ -482,9 +542,26 @@ export default function GenerateContentPage() {
                     Enable Email Report
                   </label>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Configure in <a href="/settings" style={{ color: 'var(--color-blue-400)' }}>Settings</a></div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>SMTP server configured in <a href="/settings" style={{ color: 'var(--color-blue-400)' }}>Settings</a></div>
               </div>
             </div>
+
+            {enableSmtp && (
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label className="form-label">Notify Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="you@company.com"
+                  value={notifyEmail}
+                  onChange={(e) => setNotifyEmail(e.target.value)}
+                  disabled={isGenerating && !isPaused}
+                />
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                  Sent a summary (generated/error counts) when this run finishes or fails.
+                </div>
+              </div>
+            )}
 
             <div className="form-group" style={{ marginTop: '16px' }}>
               <label className="form-label">Limit (rows to generate this run)</label>
@@ -500,6 +577,21 @@ export default function GenerateContentPage() {
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                 Generate only the next N pending rows now. Run generation again later to continue with the rest.
               </div>
+            </div>
+
+            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={saveDefaultSettings}
+                disabled={savingDefaults}
+              >
+                {savingDefaults ? 'Saving...' : 'Save Settings'}
+              </button>
+              {defaultsSaved && <span className="badge badge-success">Saved - will reload next time</span>}
+              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                Saves prompt, AI model, and notify email so they're here next time.
+              </span>
             </div>
           </div>
         </div>

@@ -12,11 +12,20 @@ model Settings {
   smtpHost       String?
   smtpPort       String?
   smtpEncryption String?
-  smtpUsername   String?
+  smtpUsername   String? // SMTP auth login - many providers (incl. SMTP2GO) use an account/domain handle here, NOT a valid email address, so it must not be reused as the "From" sender
   smtpPassword   String?
+  smtpFromEmail  String? // actual "From" sender address - separate from smtpUsername on purpose, see above
+  smtpFromName   String? // optional display name, e.g. "Venture27 Notifications"
   openaiKey      String?
   anthropicKey   String?
   geminiKey      String?
+  // Last-used Generate Content settings, saved explicitly via its own "Save
+  // Settings" button (not auto-persisted) so a page refresh doesn't force
+  // re-entering the prompt/model/notify-email every time.
+  defaultPromptTemplate String?
+  defaultAiModel        String?
+  defaultNotifyEmail    String?
+  defaultEnableSmtp     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -95,6 +104,7 @@ model Job {
   generatedCount Int      @default(0)
   errorCount     Int      @default(0)
   errorLogs      String?
+  notifyEmail    String? // recipient for the completion/failure summary email, if the user opted in for this run
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
