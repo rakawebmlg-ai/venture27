@@ -219,6 +219,17 @@ async function runGeneration(jobId: number, categoryId: number, promptTemplate: 
       return;
     }
 
+    // BullMQ redelivers a job that was still "active" (i.e. mid-run) when the
+    // worker process last died, even if the user had explicitly clicked Stop
+    // in between - a plain unconditional 'running' write here would silently
+    // resume it (and its real AI API calls) on every worker restart. Bail out
+    // instead if the DB row itself says the user stopped it.
+    const preRunJob = await prisma.job.findUnique({ where: { id: jobId } });
+    if (preRunJob?.status === 'stopped') {
+      console.log(`Job ${jobId} was stopped before this run started - not resuming.`);
+      return;
+    }
+
     // Update job status to running
     await prisma.job.update({
       where: { id: jobId },
