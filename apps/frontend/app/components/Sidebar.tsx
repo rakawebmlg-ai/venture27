@@ -119,7 +119,7 @@ export default function Sidebar() {
         <div className="sidebar-brand">
           <img src="/venture27-logo.png" alt="Venture27" className="sidebar-brand-logo" />
           <div className="sidebar-brand-text">
-            <span>Data Generator</span>
+            <span>Programmatic Page</span>
           </div>
         </div>
       </div>

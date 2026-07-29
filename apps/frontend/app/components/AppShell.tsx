@@ -15,7 +15,7 @@ const PROGRAMMATIC_PAGE_PATTERN = /^\/[^/]+\/services\/[^/]+\/[^/]+\/[^/]+\/?$/;
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname && PROGRAMMATIC_PAGE_PATTERN.test(pathname)) {
+  if (pathname === '/login' || (pathname && PROGRAMMATIC_PAGE_PATTERN.test(pathname))) {
     return <>{children}</>;
   }
 
