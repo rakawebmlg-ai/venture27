@@ -140,9 +140,10 @@ Active Development / Polishing (first production deployment now live)
 ## In Progress
 - None.
 
+- **Item -33's Express refactor was pushed to `origin` (GitLab, production) and `github` (secondary mirror) on 2026-08-02**, per explicit approval ("oke silahkan push"). Checked BEFORE pushing whether `deploy/entrypoint.sh`/the Dockerfile needed any change for the new structure: they don't - `entrypoint.sh` already just runs `npx tsx apps/backend/src/index.ts` as one process (which now internally wires up Express + all routes) and the frontend's `BACKEND_URL` default (`http://localhost:3001`) already matches the backend's own `PORT` default set by the entrypoint, so the rewrite resolves correctly with zero deploy-config changes. The Dockerfile's root `npm install` also already covers the new `dotenv`/`papaparse` deps via the updated `package-lock.json`. Auto-deploy's cron (`*/2 * * * *` on `venture27-prod`) will pick this up on its own within a couple minutes of the push - no manual deploy step needed.
+
 ## Pending
-- Push the Express refactor (item -33 above) to `main` - done and verified locally, awaiting the user's explicit go-ahead per their standing "jangan di push dulu" instruction. Once pushed, `docs/ai-context/SESSION_HANDOVER.md`'s stray-dead-code note about `apps/frontend/worker.ts` is already stale (that file was deleted in a prior session) and `Decisions.md`'s matching note needs the same cleanup - see DECISIONS.md.
-- Update `deploy/entrypoint.sh`/the production Dockerfile if the refactor gets pushed - it currently backgrounds a single `apps/backend` process and foregrounds `next start`; confirm the rewrite-based proxy (`BACKEND_URL` defaulting to `http://localhost:3001`) still resolves correctly inside the single-container prod setup before/when this ships.
+- Confirm with the user, next time they check, that production actually picked up and is running the new Express-backend structure cleanly post-auto-deploy (health check `/health`, a real login, a real Master Data/Generate Content round trip) - not yet independently re-verified live on `venture27-prod` after this push.
 - Pause/Resume on `/generate-content` (Resume is a no-op, see Known Problems below).
 
 ## Blocked
