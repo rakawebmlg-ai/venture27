@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { Router } from 'express';
 import { prisma } from '@venture27/database';
 
-export async function GET() {
+const router = Router();
+
+router.get('/', async (req, res) => {
   try {
     // Location/Service rows are kept as reusable templates even after their
     // Master Data combinations are deleted (e.g. via "Delete Category"), so a
@@ -12,12 +14,12 @@ export async function GET() {
     const servicesCount = await prisma.service.count({ where: { data: { some: {} } } });
     const masterDataCount = await prisma.masterData.count();
     const generatedCount = await prisma.masterData.count({ where: { status: 'generated' } });
-    
+
     const lastJob = await prisma.job.findFirst({
       orderBy: { id: 'desc' }
     });
 
-    return NextResponse.json({
+    res.json({
       stats: {
         locations: locationsCount,
         coreServices: servicesCount,
@@ -28,6 +30,8 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Failed to fetch overview data:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
+
+export default router;

@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@venture27/database';
+import { Router } from 'express';
+import { prisma, renderPlaceholders } from '@venture27/database';
 import Papa from 'papaparse';
-import { renderPlaceholders } from '../../lib/placeholders';
 
-export async function GET(req: Request) {
+const router = Router();
+
+router.get('/', async (req, res) => {
   try {
     const data = await prisma.masterData.findMany({
       include: { location: true, service: true, category: true },
@@ -24,18 +25,18 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json(rendered);
+    res.json(rendered);
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch master data' }, { status: 500 });
+    res.status(500).json({ error: 'Failed to fetch master data' });
   }
-}
+});
 
-export async function POST(req: Request) {
+router.post('/', async (req, res) => {
   try {
-    const { category, locationsCsv, servicesCsv } = await req.json();
+    const { category, locationsCsv, servicesCsv } = req.body ?? {};
 
     if (!category || !locationsCsv || !servicesCsv) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Parse CSVs. transformHeader trims stray whitespace/BOM that Excel-exported
@@ -142,7 +143,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({
+    res.json({
       success: true,
       count: createdData.length,
       data: createdData,
@@ -152,57 +153,55 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Failed to generate master data:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
 
-export async function DELETE(req: Request) {
+router.delete('/', async (req, res) => {
   try {
-    const { searchParams } = new URL(req.url);
-    const idParam = searchParams.get('id');
-    const categoryIdParam = searchParams.get('categoryId');
+    const idParam = req.query.id as string | undefined;
+    const categoryIdParam = req.query.categoryId as string | undefined;
 
     if (idParam) {
       const id = Number(idParam);
       if (Number.isNaN(id)) {
-        return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+        return res.status(400).json({ error: 'Invalid id' });
       }
       await prisma.masterData.delete({ where: { id } });
-      return NextResponse.json({ success: true, count: 1 });
+      return res.json({ success: true, count: 1 });
     }
 
     if (categoryIdParam) {
       const categoryId = Number(categoryIdParam);
       if (Number.isNaN(categoryId)) {
-        return NextResponse.json({ error: 'Invalid categoryId' }, { status: 400 });
+        return res.status(400).json({ error: 'Invalid categoryId' });
       }
       const { count } = await prisma.masterData.deleteMany({ where: { categoryId } });
-      return NextResponse.json({ success: true, count });
+      return res.json({ success: true, count });
     }
 
-    const body = await req.json().catch(() => null);
-    const ids = body?.ids;
+    const ids = req.body?.ids;
     if (Array.isArray(ids) && ids.length > 0) {
       const { count } = await prisma.masterData.deleteMany({ where: { id: { in: ids.map(Number) } } });
-      return NextResponse.json({ success: true, count });
+      return res.json({ success: true, count });
     }
 
-    return NextResponse.json({ error: 'Provide id, categoryId, or ids' }, { status: 400 });
+    res.status(400).json({ error: 'Provide id, categoryId, or ids' });
   } catch (error) {
     console.error('Failed to delete master data:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
 
 // Resets rows back to 'pending' so they can be regenerated: clears content,
 // image, errorMessage, and unpublishes (a published row with wiped content
 // shouldn't stay marked published).
-export async function PATCH(req: Request) {
+router.patch('/', async (req, res) => {
   try {
-    const { action, ids, categoryId, status } = await req.json();
+    const { action, ids, categoryId, status } = req.body ?? {};
 
     if (action !== 'reset') {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return res.status(400).json({ error: 'Invalid action' });
     }
 
     const where: any = {};
@@ -214,7 +213,7 @@ export async function PATCH(req: Request) {
       // both 'generated' and 'error' (never touch rows already 'pending').
       where.status = status === 'error' || status === 'generated' ? status : { in: ['generated', 'error'] };
     } else {
-      return NextResponse.json({ error: 'Provide ids or categoryId' }, { status: 400 });
+      return res.status(400).json({ error: 'Provide ids or categoryId' });
     }
 
     const { count } = await prisma.masterData.updateMany({
@@ -229,9 +228,11 @@ export async function PATCH(req: Request) {
       }
     });
 
-    return NextResponse.json({ success: true, count });
+    res.json({ success: true, count });
   } catch (error) {
     console.error('Failed to reset master data status:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
+
+export default router;

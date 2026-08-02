@@ -1,7 +1,5 @@
-import { prisma } from '@venture27/database';
+import { prisma, renderPlaceholders, combineLocationName } from '@venture27/database';
 import { notFound } from 'next/navigation';
-import { renderPlaceholders } from '../../../../../lib/placeholders';
-import { combineLocationName } from '../../../../../lib/location';
 
 // [type] is 'city' | 'community' | 'county' (whichever was primary for this
 // row at import time - see lib/location.ts#primaryLocationType), [value] is

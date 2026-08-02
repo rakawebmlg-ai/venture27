@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE_NAME, verifySessionToken } from './app/lib/session';
+// Subpath import (not the '@venture27/database' barrel) - proxy.ts runs in
+// the Edge Runtime, which can't load PrismaClient (instantiated at module
+// scope in the barrel's index.ts).
+import { SESSION_COOKIE_NAME, verifySessionToken } from '@venture27/database/lib/session';
 
 // Next.js 16 renamed Middleware to Proxy (same mechanism, new file name/
 // export) - see node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md.

@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { buildSlug } from '../lib/slug';
-import { primaryLocationType, combineLocationName, LocationType } from '../lib/location';
-import { renderPlaceholders } from '../lib/placeholders';
+// Subpath imports (not the '@venture27/database' barrel) - this is a client
+// component, and the barrel's index.ts also instantiates PrismaClient at
+// module scope, which must never end up in a browser bundle.
+import { buildSlug } from '@venture27/database/lib/slug';
+import { primaryLocationType, combineLocationName, LocationType } from '@venture27/database/lib/location';
+import { renderPlaceholders } from '@venture27/database/lib/placeholders';
 import PaginationRow, { paginate, clampPage, PAGE_SIZE } from './Pagination';
 
 // Rows published before the slug column existed (or that hit a naming

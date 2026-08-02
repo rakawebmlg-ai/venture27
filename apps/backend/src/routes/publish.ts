@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@venture27/database';
-import { renderPlaceholders } from '../../lib/placeholders';
-import { buildSlug } from '../../lib/slug';
-import { primaryLocationType } from '../../lib/location';
+import { Router } from 'express';
+import { prisma, renderPlaceholders, buildSlug, primaryLocationType } from '@venture27/database';
 
-export async function GET(req: Request) {
+const router = Router();
+
+router.get('/', async (req, res) => {
   try {
     const data = await prisma.masterData.findMany({
       where: { status: 'generated' },
@@ -26,19 +25,19 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json(rendered);
+    res.json(rendered);
   } catch (error) {
     console.error('Failed to fetch publishable content:', error);
-    return NextResponse.json({ error: 'Failed to fetch publishable content' }, { status: 500 });
+    res.status(500).json({ error: 'Failed to fetch publishable content' });
   }
-}
+});
 
-export async function POST(req: Request) {
+router.post('/', async (req, res) => {
   try {
-    const { action, ids, categoryId } = await req.json();
+    const { action, ids, categoryId } = req.body ?? {};
 
     if (action !== 'import' && action !== 'unpublish') {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return res.status(400).json({ error: 'Invalid action' });
     }
 
     const publishing = action === 'import';
@@ -56,7 +55,7 @@ export async function POST(req: Request) {
     } else if (categoryId) {
       where.categoryId = Number(categoryId);
     } else {
-      return NextResponse.json({ error: 'Provide ids or categoryId' }, { status: 400 });
+      return res.status(400).json({ error: 'Provide ids or categoryId' });
     }
 
     if (!publishing) {
@@ -67,7 +66,7 @@ export async function POST(req: Request) {
         where,
         data: { published: false, publishedAt: null }
       });
-      return NextResponse.json({ success: true, count });
+      return res.json({ success: true, count });
     }
 
     // Importing (publishing) computes a slug per row from its own
@@ -109,9 +108,11 @@ export async function POST(req: Request) {
       count++;
     }
 
-    return NextResponse.json({ success: true, count });
+    res.json({ success: true, count });
   } catch (error) {
     console.error('Failed to update publish status:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
+
+export default router;

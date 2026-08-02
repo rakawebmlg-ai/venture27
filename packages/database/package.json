@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@prisma/client": "^5.11.0"
+    "@prisma/client": "^5.11.0",
+    "jose": "^5.9.6"
   },
   "devDependencies": {
     "prisma": "^5.11.0"

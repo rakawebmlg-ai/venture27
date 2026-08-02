@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { combineLocationName } from '../lib/location';
+// Subpath import (not the '@venture27/database' barrel) - this is a client
+// component, and the barrel's index.ts also instantiates PrismaClient at
+// module scope, which must never end up in a browser bundle.
+import { combineLocationName } from '@venture27/database/lib/location';
 import PaginationRow, { paginate, clampPage, PAGE_SIZE } from '../components/Pagination';
 
 export default function ImportPage() {

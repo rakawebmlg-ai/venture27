@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { Router } from 'express';
 import { prisma } from '@venture27/database';
 
-export async function GET() {
+const router = Router();
+
+router.get('/', async (req, res) => {
   try {
     let settings = await prisma.settings.findFirst();
     if (!settings) {
@@ -9,18 +11,18 @@ export async function GET() {
         data: {},
       });
     }
-    return NextResponse.json(settings);
+    res.json(settings);
   } catch (error) {
     console.error('Failed to fetch settings:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
 
-export async function POST(req: Request) {
+router.post('/', async (req, res) => {
   try {
-    const data = await req.json();
+    const data = req.body ?? {};
     let settings = await prisma.settings.findFirst();
-    
+
     if (settings) {
       settings = await prisma.settings.update({
         where: { id: settings.id },
@@ -32,9 +34,11 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json(settings);
+    res.json(settings);
   } catch (error) {
     console.error('Failed to save settings:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
+
+export default router;

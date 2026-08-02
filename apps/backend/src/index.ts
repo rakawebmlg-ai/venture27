@@ -1,388 +1,41 @@
+// Must run before any other import - `worker`/the route modules pull in
+// @venture27/database's session helper, which reads SESSION_SECRET from
+// process.env at module-load time. In production the container's shell
+// already has DASHBOARD_USERNAME/PASSWORD/SESSION_SECRET exported (see
+// deploy/entrypoint.sh), so this is a no-op there; in local dev, nothing
+// else loads apps/backend/.env the way Next.js auto-loads the frontend's
+// .env.local, so without this, login (now handled here, not in Next.js)
+// would always fail with "not configured".
+import 'dotenv/config';
 import express from 'express';
-import { Worker, Job } from 'bullmq';
-import Redis from 'ioredis';
-import { prisma, MasterData } from '@venture27/database';
-import { generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import nodemailer from 'nodemailer';
+import { worker } from './worker';
+import authRoutes from './routes/auth';
+import masterDataRoutes from './routes/masterData';
+import generateRoutes from './routes/generate';
+import jobsRoutes from './routes/jobs';
+import overviewRoutes from './routes/overview';
+import promptsRoutes from './routes/prompts';
+import publishRoutes from './routes/publish';
+import settingsRoutes from './routes/settings';
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Redis Connection
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null
-});
+app.use(express.json());
 
-// AI Config Helper
-async function getSettings() {
-  let settings = await prisma.settings.findFirst();
-  if (!settings) {
-    settings = await prisma.settings.create({ data: {} });
-  }
-  return settings;
-}
+// Reachable only from the frontend container/process (apps/frontend's
+// next.config.mjs rewrites /api/:path* here) - never exposed directly to
+// the internet, so no CORS setup is needed. Auth is enforced upstream by
+// apps/frontend/proxy.ts before a request ever reaches this rewrite.
+app.use('/api/auth', authRoutes);
+app.use('/api/master-data', masterDataRoutes);
+app.use('/api/generate', generateRoutes);
+app.use('/api/jobs', jobsRoutes);
+app.use('/api/overview', overviewRoutes);
+app.use('/api/prompts', promptsRoutes);
+app.use('/api/publish', publishRoutes);
+app.use('/api/settings', settingsRoutes);
 
-// The <select> in the Generate Content UI sends these short values as
-// `aiModel`, but the actual provider SDKs need their real, versioned model
-// IDs (Anthropic requires a dated snapshot; Google's SDK here requires a
-// `models/` prefix and dots, not hyphens, in the version number) - passing
-// the short value straight through makes every request fail with a
-// model-not-found error, so every row silently ends up 'error'.
-// Renders {{City}}/{{Province}} inside a Service's meta template (metaTitle,
-// heading, etc.) so the values injected into the prompt below are the actual
-// per-location text, not the raw "{{City}}" placeholder.
-function renderMetaField(text: string | null | undefined, city: string, province: string): string {
-  if (!text) return '';
-  return text.replace(/\{\{\s*city\s*\}\}/gi, city).replace(/\{\{\s*province\s*\}\}/gi, province);
-}
-
-// City/Community/County are all optional now - pick whichever is actually
-// set (most specific first) as the "place" name for prompt text and
-// filenames, instead of assuming city is always present.
-function primaryLocationName(city?: string | null, community?: string | null, county?: string | null): string {
-  return community || city || county || 'location';
-}
-
-// Sends the "N generated / M error" result summary a user opted into via the
-// Notify Email field on Generate Content. Never throws - a broken SMTP
-// config or a failed send should show up in the backend log, not blow up
-// the generation job that already ran (successfully or not) by this point.
-async function sendJobResultEmail(params: {
-  to: string;
-  jobId: number;
-  status: 'completed' | 'failed';
-  categoryName?: string | null;
-  totalItems: number;
-  generatedCount: number;
-  errorCount: number;
-  errorLogs?: string | null;
-  settings: { smtpHost?: string | null; smtpPort?: string | null; smtpEncryption?: string | null; smtpUsername?: string | null; smtpPassword?: string | null; smtpFromEmail?: string | null; smtpFromName?: string | null };
-}) {
-  const { to, settings, jobId } = params;
-
-  if (!settings.smtpHost || !settings.smtpUsername || !settings.smtpPassword) {
-    console.log(`[Job ${jobId}] Skipping notification email to ${to} - SMTP is not configured in Settings.`);
-    return;
-  }
-
-  // smtpUsername is the SMTP *auth* login - many providers (SMTP2GO,
-  // Mailgun, etc.) issue an account handle here that isn't itself a
-  // deliverable email address, so it must never be reused as the "From"
-  // address (confirmed live: doing so got every send rejected with
-  // "550 ... blank sender"). smtpFromEmail is a separate, required field
-  // for exactly this reason - skip rather than guess if it's missing.
-  if (!settings.smtpFromEmail) {
-    console.log(`[Job ${jobId}] Skipping notification email to ${to} - "From Email" is not set in Settings (SMTP Username alone isn't a valid sender address for most providers).`);
-    return;
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: settings.smtpHost,
-      port: Number(settings.smtpPort) || 587,
-      // 'SSL' = implicit TLS (typically port 465); 'TLS' = STARTTLS on a
-      // plain connection (typically port 587); 'None' = unencrypted.
-      secure: settings.smtpEncryption === 'SSL',
-      ...(settings.smtpEncryption === 'TLS' ? { requireTLS: true } : {}),
-      auth: { user: settings.smtpUsername, pass: settings.smtpPassword },
-    });
-
-    const statusLabel = params.status === 'completed' ? 'Completed' : 'Failed';
-    const subject = `Venture27 - Content Generation Job #${jobId} ${statusLabel}${params.categoryName ? ` (${params.categoryName})` : ''}`;
-    const lines = [
-      `Job #${jobId} ${params.status === 'completed' ? 'finished running' : 'failed to start'}.`,
-      params.categoryName ? `Category: ${params.categoryName}` : null,
-      `Total items this run: ${params.totalItems}`,
-      `Generated: ${params.generatedCount}`,
-      `Errors: ${params.errorCount}`,
-      params.errorLogs ? `\nFailure reason: ${params.errorLogs}` : null,
-    ].filter((line): line is string => Boolean(line));
-
-    await transporter.sendMail({
-      from: settings.smtpFromName ? `"${settings.smtpFromName}" <${settings.smtpFromEmail}>` : settings.smtpFromEmail,
-      to,
-      subject,
-      text: lines.join('\n'),
-    });
-    console.log(`[Job ${jobId}] Notification email sent to ${to}`);
-  } catch (err) {
-    console.error(`[Job ${jobId}] Failed to send notification email to ${to}:`, err);
-  }
-}
-
-const MODEL_IDS: Record<string, string> = {
-  'gpt-4o': 'gpt-4o',
-  'claude-3-5-sonnet': 'claude-3-5-sonnet-20240620',
-  // 'gemini-1.5-pro' was retired by Google - '-latest' aliases always point
-  // at Google's current recommended model for that tier, so these shouldn't
-  // go stale the same way.
-  'gemini-flash-latest': 'models/gemini-flash-latest',
-  'gemini-pro-latest': 'models/gemini-pro-latest',
-};
-
-// Job Payload Types
-interface GenerationJobPayload {
-  jobId: number;
-  categoryId: number;
-  promptTemplate: string;
-  aiModel: string;
-  limit?: number;
-}
-
-// BullMQ Worker
-const worker = new Worker<GenerationJobPayload>(
-  'generate-content',
-  async (job: Job<GenerationJobPayload>) => {
-    const { jobId, categoryId, promptTemplate, aiModel, limit } = job.data;
-    console.log(`[Job ${job.id}] Started AI Generation for Database Job ID: ${jobId}`);
-
-    // Everything below is wrapped so a setup failure (missing API key,
-    // unsupported model, DB hiccup before the per-item loop) marks the Job
-    // row 'failed' with a reason instead of leaving it stuck at 'running'/0%
-    // forever - previously an unhandled throw here only reached BullMQ's own
-    // logging (`worker.on('failed', ...)`) and never touched our Job row, so
-    // the UI just spun indefinitely with no way to tell what happened.
-    try {
-      const settings = await getSettings();
-
-      // Setup AI provider
-      const modelId = MODEL_IDS[aiModel] || (aiModel.startsWith('gpt-') ? aiModel : undefined);
-      if (!modelId) throw new Error(`Unsupported AI model: ${aiModel}`);
-
-      let aiProvider: any;
-      if (aiModel === 'gpt-4o' || aiModel.startsWith('gpt-')) {
-        if (!settings.openaiKey) throw new Error('OpenAI API Key not configured');
-        const openai = createOpenAI({ apiKey: settings.openaiKey });
-        aiProvider = openai(modelId);
-      } else if (aiModel === 'claude-3-5-sonnet') {
-        if (!settings.anthropicKey) throw new Error('Anthropic API Key not configured');
-        const anthropic = createAnthropic({ apiKey: settings.anthropicKey });
-        aiProvider = anthropic(modelId);
-      } else if (aiModel.startsWith('gemini-')) {
-        if (!settings.geminiKey) throw new Error('Gemini API Key not configured');
-        const google = createGoogleGenerativeAI({ apiKey: settings.geminiKey });
-        aiProvider = google(modelId);
-      } else {
-        throw new Error(`Unsupported AI model: ${aiModel}`);
-      }
-
-      await runGeneration(jobId, categoryId, promptTemplate, limit, aiProvider);
-    } catch (err: any) {
-      console.error(`[Job ${job.id}] Setup failed for Database Job ID: ${jobId}:`, err);
-      const errorLogs = String(err?.message || err).slice(0, 1000);
-      const failedJob = await prisma.job.update({
-        where: { id: jobId },
-        data: { status: 'failed', errorLogs }
-      }).catch((updateErr: any) => {
-        console.error(`Also failed to record the failure on Job ${jobId}:`, updateErr);
-        return null;
-      });
-      if (failedJob?.notifyEmail) {
-        const category = await prisma.category.findUnique({ where: { id: categoryId } }).catch(() => null);
-        const emailSettings = await getSettings().catch(() => null);
-        if (emailSettings) {
-          await sendJobResultEmail({
-            to: failedJob.notifyEmail,
-            jobId,
-            status: 'failed',
-            categoryName: category?.name,
-            totalItems: failedJob.totalItems,
-            generatedCount: failedJob.generatedCount,
-            errorCount: failedJob.errorCount,
-            errorLogs,
-            settings: emailSettings,
-          });
-        }
-      }
-      throw err;
-    }
-  },
-  { connection: redis, concurrency: 1 }
-);
-
-async function runGeneration(jobId: number, categoryId: number, promptTemplate: string, limit: number | undefined, aiProvider: any) {
-    // Fetch pending combinations for this category, capped at `limit` so a run
-    // only processes the next N rows and leaves the rest 'pending' for a later run.
-    // orderBy must match /api/master-data's own `id: 'desc'` (newest at the
-    // top of the Master Data / Content Preview tables) - otherwise the row
-    // shown at the top of the list is actually the last one generated.
-    const pendingItems = await prisma.masterData.findMany({
-      where: { categoryId, status: 'pending' },
-      include: { location: true, service: true, category: true },
-      orderBy: { id: 'desc' },
-      ...(limit ? { take: limit } : {})
-    });
-
-    if (pendingItems.length === 0) {
-      console.log('No pending items found.');
-      await prisma.job.update({ where: { id: jobId }, data: { status: 'completed', progress: 100 } });
-      return;
-    }
-
-    // BullMQ redelivers a job that was still "active" (i.e. mid-run) when the
-    // worker process last died, even if the user had explicitly clicked Stop
-    // in between - a plain unconditional 'running' write here would silently
-    // resume it (and its real AI API calls) on every worker restart. Bail out
-    // instead if the DB row itself says the user stopped it.
-    const preRunJob = await prisma.job.findUnique({ where: { id: jobId } });
-    if (preRunJob?.status === 'stopped') {
-      console.log(`Job ${jobId} was stopped before this run started - not resuming.`);
-      return;
-    }
-
-    // Update job status to running
-    await prisma.job.update({
-      where: { id: jobId },
-      data: { status: 'running' }
-    });
-
-    let attemptedCount = 0;
-    let ranToCompletion = true;
-
-    for (const item of pendingItems) {
-      // Check if job was paused or stopped
-      const currentJob = await prisma.job.findUnique({ where: { id: jobId } });
-      if (!currentJob) { ranToCompletion = false; break; }
-      if (currentJob.status === 'stopped') {
-        console.log(`Job ${jobId} was stopped.`);
-        ranToCompletion = false;
-        break;
-      }
-      if (currentJob.status === 'paused') {
-        console.log(`Job ${jobId} was paused. Worker will skip remaining items, to be resumed later.`);
-        ranToCompletion = false;
-        break; // Stop processing, resume will create a new worker run
-      }
-
-      let succeeded = false;
-      try {
-        const place = primaryLocationName(item.location.city, item.location.community, item.location.county);
-        console.log(`Processing MasterData ID ${item.id} - ${place} - ${item.service.name}`);
-
-        // Inject variables into prompt. Supports both the short snake_case
-        // names shown in the UI hint ({{city}}, {{service_name}}, ...) and
-        // the longer names real-world prompt.md files tend to use
-        // ({{City/Community}}, {{Service Name}}, {{Meta Title}}, ...) -
-        // a prompt using a variable that isn't in this list passes through
-        // unreplaced, which the AI model then sees as literal "{{...}}" text
-        // and tends to echo back or get confused by. City/Community/County
-        // are each individually optional, so {{city}} etc. can render blank
-        // for a row that only has, say, a County set.
-        const city = item.location.city || '';
-        const province = item.location.province;
-        const community = item.location.community || '';
-        const county = item.location.county || '';
-        const substitutions: [RegExp, string][] = [
-          [/\{\{\s*city\s*\}\}/gi, city],
-          [/\{\{\s*province\s*\}\}/gi, province],
-          [/\{\{\s*community\s*\}\}/gi, community],
-          [/\{\{\s*county\s*\}\}/gi, county],
-          // City/Community historically meant "whichever local-area name
-          // applies" - now that Community is its own field, prefer it when
-          // set and fall back to City.
-          [/\{\{\s*city\s*\/\s*community\s*\}\}/gi, community || city],
-          [/\{\{\s*service[_\s]?name\s*\}\}/gi, item.service.name],
-          [/\{\{\s*category\s*\}\}/gi, item.category?.name || ''],
-          [/\{\{\s*meta[_\s]?title\s*\}\}/gi, renderMetaField(item.service.metaTitle, city, province)],
-          [/\{\{\s*meta[_\s]?description\s*\}\}/gi, renderMetaField(item.service.metaDescription, city, province)],
-          [/\{\{\s*heading\s*\}\}/gi, renderMetaField(item.service.heading, city, province)],
-          [/\{\{\s*subheading\s*\}\}/gi, renderMetaField(item.service.subheading, city, province)],
-          [/\{\{\s*no\s*\}\}/gi, String(item.id)],
-        ];
-        let finalPrompt = promptTemplate;
-        for (const [pattern, value] of substitutions) {
-          finalPrompt = finalPrompt.replace(pattern, value);
-        }
-
-        // Call AI. Newer Gemini models spend part of this budget on internal
-        // "thinking" tokens before writing any visible text - at 1500 that
-        // regularly ate ~1200 tokens of thinking alone, so the actual article
-        // got cut off mid-sentence (finishReason: MAX_TOKENS) well short of
-        // what was asked for. 8000 leaves enough room for both.
-        const { text } = await generateText({
-          model: aiProvider,
-          prompt: finalPrompt,
-          maxTokens: 8000,
-        });
-
-        // Update Master Data
-        await prisma.masterData.update({
-          where: { id: item.id },
-          data: {
-            content: text,
-            status: 'generated',
-            errorMessage: null,
-            image: `${place.toLowerCase().replace(/\s+/g, '-')}-${item.service.name.toLowerCase().replace(/\s+/g, '-')}.jpg`
-          }
-        });
-        succeeded = true;
-      } catch (err: any) {
-        console.error(`Error generating for ID ${item.id}:`, err);
-        const errorMessage = String(err?.message || err).slice(0, 1000);
-        await prisma.masterData.update({
-          where: { id: item.id },
-          data: { status: 'error', errorMessage }
-        });
-      }
-
-      // Progress is scoped to this run's batch (attempted, not just successful,
-      // so a single failed item doesn't stall the bar or block completion) rather
-      // than the whole category's lifetime generated count. generatedCount/
-      // errorCount are tallied the same way, scoped to this run, so the UI can
-      // show "N generated, M error" for the batch currently in progress.
-      attemptedCount++;
-      const progress = Math.min(100, Math.floor((attemptedCount / pendingItems.length) * 100));
-      await prisma.job.update({
-        where: { id: jobId },
-        data: {
-          progress,
-          ...(succeeded ? { generatedCount: { increment: 1 } } : { errorCount: { increment: 1 } })
-        }
-      });
-
-      // Wait to avoid rate limits
-      await new Promise(r => setTimeout(r, 1000));
-    }
-
-    // Only flip to 'completed' if the batch actually ran to the end (not paused/stopped
-    // mid-way) and the job wasn't paused/stopped by the time we got here.
-    const finalJob = await prisma.job.findUnique({ where: { id: jobId } });
-    if (finalJob && finalJob.status === 'running' && ranToCompletion) {
-      // Note: `completedAt` is not a field on the Job model - do not add it here
-      // without a matching schema migration, or this update throws and the job
-      // silently never reaches 'completed' status.
-      await prisma.job.update({
-        where: { id: jobId },
-        data: { status: 'completed', progress: 100 }
-      });
-      console.log(`Job ${jobId} completed fully.`);
-
-      if (finalJob.notifyEmail) {
-        const emailSettings = await getSettings().catch(() => null);
-        if (emailSettings) {
-          await sendJobResultEmail({
-            to: finalJob.notifyEmail,
-            jobId,
-            status: 'completed',
-            categoryName: pendingItems[0]?.category?.name,
-            totalItems: finalJob.totalItems,
-            generatedCount: finalJob.generatedCount,
-            errorCount: finalJob.errorCount,
-            settings: emailSettings,
-          });
-        }
-      }
-    }
-}
-
-worker.on('failed', (job, err) => {
-  console.error(`BullMQ Job ${job?.id} failed:`, err);
-});
-
-// Express endpoints
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', worker: worker.isRunning() });
 });

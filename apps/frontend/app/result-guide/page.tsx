@@ -1,8 +1,6 @@
-import { prisma } from '@venture27/database';
+import { prisma, renderPlaceholders, combineLocationName } from '@venture27/database';
 import { headers } from 'next/headers';
 import { getSitemapChunks } from '../lib/sitemapData';
-import { renderPlaceholders } from '../lib/placeholders';
-import { combineLocationName } from '../lib/location';
 
 export default async function ResultGuidePage() {
   const headersList = await headers();

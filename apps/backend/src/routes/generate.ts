@@ -1,20 +1,16 @@
-import { NextResponse } from 'next/server';
+import { Router } from 'express';
 import { prisma } from '@venture27/database';
-import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
+import { generateQueue } from '../queue';
 
-const redis = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null
-});
-const generateQueue = new Queue('generate-content', { connection: redis });
+const router = Router();
 
-export async function POST(req: Request) {
+router.post('/', async (req, res) => {
   try {
-    const { action, categoryId, promptTemplate, aiModel, jobId, limit, notifyEmail } = await req.json();
+    const { action, categoryId, promptTemplate, aiModel, jobId, limit, notifyEmail } = req.body ?? {};
 
     if (action === 'start') {
       if (!categoryId || !promptTemplate || !aiModel) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        return res.status(400).json({ error: 'Missing required fields' });
       }
 
       // Count total pending items for this category
@@ -23,7 +19,7 @@ export async function POST(req: Request) {
       });
 
       if (pendingCount === 0) {
-        return NextResponse.json({ error: 'No pending items for this category' }, { status: 400 });
+        return res.status(400).json({ error: 'No pending items for this category' });
       }
 
       // A positive limit caps this run to the next N pending rows, so the
@@ -50,57 +46,56 @@ export async function POST(req: Request) {
         limit: totalItems
       });
 
-      return NextResponse.json(jobRecord);
+      return res.json(jobRecord);
     }
-    
+
     if (action === 'pause') {
       const job = await prisma.job.update({
         where: { id: jobId },
         data: { status: 'paused' }
       });
-      return NextResponse.json(job);
+      return res.json(job);
     }
-    
+
     if (action === 'resume') {
       const job = await prisma.job.update({
         where: { id: jobId },
         data: { status: 'running' }
       });
-      
+
       // Need to re-trigger the BullMQ worker for the remaining items.
       // We need to fetch the original arguments, which is tricky unless we stored them.
       // But for simplicity, we'll just return a success since this is a mock resume or we would need to store promptTemplate in the DB Job table.
       // In a real app, `jobRecord` should contain `categoryId`, `promptTemplate`, etc.
       // For now, since the worker fetches pending items, we would just re-add to queue if we saved the prompt.
-      
-      return NextResponse.json(job);
+
+      return res.json(job);
     }
-    
+
     if (action === 'stop') {
       const job = await prisma.job.update({
         where: { id: jobId },
         data: { status: 'stopped' }
       });
-      return NextResponse.json(job);
+      return res.json(job);
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    res.status(400).json({ error: 'Invalid action' });
   } catch (error) {
     console.error('Failed to handle generate action:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const jobId = searchParams.get('jobId');
+router.get('/', async (req, res) => {
+  const jobId = req.query.jobId as string | undefined;
 
   try {
     if (jobId) {
       const job = await prisma.job.findUnique({
         where: { id: Number(jobId) }
       });
-      return NextResponse.json(job);
+      return res.json(job);
     }
 
     // No jobId: the page calls this on load to reattach to whatever's still
@@ -113,8 +108,10 @@ export async function GET(req: Request) {
       where: { status: { in: ['running', 'paused'] } },
       orderBy: { id: 'desc' }
     });
-    return NextResponse.json(activeJob);
+    res.json(activeJob);
   } catch (err) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+});
+
+export default router;
